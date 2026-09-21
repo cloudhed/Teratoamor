@@ -22,6 +22,8 @@ struct ElementParams
     int   octave   = 0;
     int   semitone = 0;
     float fineCents = 0.0f;
+    float warp     = 0.0f;     // 0..100
+    float clip     = 0.0f;     // 0..100 (Element 2 has no Clip control)
     float width    = 90.0f;    // 0..100
     float attack   = 0.0f;     // 0..100 (control value; 10 units = 1 second)
     float release  = 5.0f;     // 0..100

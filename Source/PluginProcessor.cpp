@@ -15,6 +15,8 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
         p.octave   = apvts.getRawParameterValue (ParamIDs::octave (e));
         p.semitone = apvts.getRawParameterValue (ParamIDs::semitone (e));
         p.fine     = apvts.getRawParameterValue (ParamIDs::fine (e));
+        p.warp     = apvts.getRawParameterValue (ParamIDs::warp (e));
+        p.clip     = e == 1 ? nullptr : apvts.getRawParameterValue (ParamIDs::clip (e));
         p.width    = apvts.getRawParameterValue (ParamIDs::width (e));
         p.attack   = apvts.getRawParameterValue (ParamIDs::attack (e));
         p.release  = apvts.getRawParameterValue (ParamIDs::release (e));
@@ -47,6 +49,8 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
         o.octave    = juce::roundToInt (p.octave->load());
         o.semitone  = juce::roundToInt (p.semitone->load());
         o.fineCents = p.fine->load();
+        o.warp      = p.warp->load();
+        o.clip      = p.clip != nullptr ? p.clip->load() : 0.0f;
         o.width     = p.width->load();
         o.attack    = p.attack->load();
         o.release   = p.release->load();

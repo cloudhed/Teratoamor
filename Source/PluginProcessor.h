@@ -51,6 +51,8 @@ private:
         std::atomic<float>* octave = nullptr;
         std::atomic<float>* semitone = nullptr;
         std::atomic<float>* fine = nullptr;
+        std::atomic<float>* warp = nullptr;
+        std::atomic<float>* clip = nullptr;   // null on Element 2
         std::atomic<float>* width = nullptr;
         std::atomic<float>* attack = nullptr;
         std::atomic<float>* release = nullptr;

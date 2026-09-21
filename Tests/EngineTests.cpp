@@ -386,6 +386,90 @@ int main()
         check (ok, "all filter modes finite and bounded across Width, pitch, sample rate, live switching");
     }
 
+    // 14. Warp and Clip (Milestone 2), compared with the reference recordings 03_warp_* and 04_clip_*.
+    {
+        const double sr = 48000.0;
+        struct Result { double h2, h3, h4, rmsDb, crestDb, dc; };
+        auto measure = [sr] (float warp, float clip)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].warp = warp; p.elements[0].clip = clip;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 6);
+            const auto sp = spectrum (c.l, sr, 48000);
+            const double f1 = sp.peak (250.0, 275.0);
+            Result r;
+            r.h2 = db (sp.peak (508.0, 538.0) / f1);
+            r.h3 = db (sp.peak (770.0, 800.0) / f1);
+            r.h4 = db (sp.peak (1030.0, 1065.0) / f1);
+            const double level = rms (c.l, 48000, c.l.size());
+            r.rmsDb = 20.0 * std::log10 (level);
+            double peak = 0, sum = 0;
+            for (size_t i = 48000; i < c.l.size(); ++i) { peak = std::max (peak, (double) std::abs (c.l[i])); sum += c.l[i]; }
+            r.crestDb = 20.0 * std::log10 (peak / level);
+            r.dc = sum / (double) (c.l.size() - 48000) / level;
+            return r;
+        };
+
+        const auto base = measure (0.0f, 0.0f);
+        std::printf ("       reference warp 25/50/75/100 -> 2nd harmonic -18.7/-14.9/-10.7/-8.1 dB (Teratoamor is deliberately stronger)\n       Teratoamor:");
+        double previous = -100.0;
+        bool warpRises = true;
+        Result w100 {};
+        for (float w : { 25.0f, 50.0f, 75.0f, 100.0f })
+        {
+            const auto r = measure (w, 0.0f);
+            std::printf (" %.1f", r.h2);
+            warpRises = warpRises && r.h2 > previous;
+            previous = r.h2;
+            if (w == 100.0f) w100 = r;
+        }
+        std::printf (" dB\n       Warp 100: 3rd harmonic %.1f dB, 4th harmonic %.1f dB (reference -25 dB), level %+.1f dB vs no Warp, DC/RMS %.4f\n",
+                     w100.h3, w100.h4, w100.rmsDb - base.rmsDb, w100.dc);
+        check (warpRises, "Warp adds a steadily growing second harmonic");
+        check (w100.h2 > -6.0 && w100.h2 < 0.0, "Warp 100 second harmonic about -3 dB (stronger than the reference)");
+        check (w100.h4 > w100.h3 + 6.0, "Warp adds a ladder of even harmonics (4th stronger than 3rd)");
+        check (w100.h2 > w100.h3 + 6.0, "Warp adds mostly even harmonics");
+        check (std::abs (w100.dc) < 0.02 && std::abs (w100.rmsDb - base.rmsDb) < 2.0, "Warp adds no DC and keeps the level");
+
+        const auto clip50  = measure (0.0f, 50.0f);
+        const auto clip75  = measure (0.0f, 75.0f);
+        const auto clip100 = measure (0.0f, 100.0f);
+        std::printf ("       Clip 50: level %+.1f dB, crest %.1f dB; Clip 75: level %+.1f dB, crest %.1f dB\n"
+                     "       Clip 100 (reference: level +12, crest 3.0 dB, 3rd harmonic -13 dB): level %+.1f dB, crest %.1f dB, 3rd %.1f dB, 2nd %.1f dB\n",
+                     clip50.rmsDb - base.rmsDb, clip50.crestDb, clip75.rmsDb - base.rmsDb, clip75.crestDb,
+                     clip100.rmsDb - base.rmsDb, clip100.crestDb, clip100.h3, clip100.h2);
+        check (clip50.crestDb < base.crestDb - 0.5 && clip75.crestDb < clip50.crestDb && clip100.crestDb < clip75.crestDb,
+               "Clip has an audible effect from about 50 and grows steadily");
+        check (std::abs (clip50.rmsDb - base.rmsDb) < 1.5 && std::abs (clip75.rmsDb - base.rmsDb) < 2.5, "Clip 50 and 75 change tone without a jump in volume");
+        check (clip100.rmsDb - base.rmsDb > 0.0 && clip100.rmsDb - base.rmsDb < 4.0, "Clip 100 is only slightly louder than no Clip (reference +12 dB, compensated)");
+        check (clip100.crestDb > 2.0 && clip100.crestDb < 4.5, "Clip 100 has a crest factor near 3 dB");
+        check (clip100.h3 > clip100.h2 + 6.0 && clip100.h3 > -20.0, "Clip 100 produces prominent odd harmonics");
+    }
+
+    // 15. Warp and Clip stay finite and bounded at their extremes in every filter mode.
+    {
+        bool ok = true;
+        for (double sr : { 44100.0, 96000.0 })
+            for (int mode = 0; mode < 6; ++mode)
+            {
+                Engine e; e.prepare (sr);
+                auto p = defaultParams();
+                for (auto& el : p.elements) { el.enabled = true; el.width = 100.0f; el.level = 100.0f; el.warp = 100.0f; el.clip = 100.0f; el.filterMode = static_cast<FilterMode> (mode); }
+                p.master = 100.0f;
+                e.setParams (p);
+                for (int note = 20; note <= 110; note += 7) e.noteOn (note, 1.0f);
+                for (int block = 0; block < 20; ++block)
+                {
+                    for (auto& el : p.elements) { el.warp = (block % 2) ? 100.0f : 0.0f; el.clip = (block % 3) ? 100.0f : 0.0f; }
+                    e.setParams (p);
+                    Capture part; renderBlocks (e, part, (int) (sr / 20));
+                    ok = ok && allFinite (part);
+                }
+            }
+        check (ok, "Warp and Clip extremes finite and bounded across modes, pitches, sample rates");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

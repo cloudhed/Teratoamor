@@ -48,6 +48,8 @@ void Engine::setParams (const EngineParams& newParams)
 
         s.pitch.target = static_cast<float> (p.octave * 12 + p.semitone) + p.fineCents / 100.0f;
         s.width.target = std::clamp (p.width, 0.0f, 100.0f) / 100.0f;
+        s.warp.target  = std::clamp (p.warp, 0.0f, 100.0f) / 100.0f;
+        s.clip.target  = std::clamp (p.clip, 0.0f, 100.0f) / 100.0f;
         s.gain.target  = (p.enabled && p.filterMode != FilterMode::off) ? std::clamp (p.level, 0.0f, 100.0f) / 100.0f : 0.0f;
         s.pan.target   = std::clamp (p.pan, -100.0f, 100.0f) / 100.0f;
     }
@@ -60,6 +62,8 @@ void Engine::setParams (const EngineParams& newParams)
         {
             s.pitch.snap (s.pitch.target);
             s.width.snap (s.width.target);
+            s.warp.snap (s.warp.target);
+            s.clip.snap (s.clip.target);
             s.gain.snap (s.gain.target);
             s.pan.snap (s.pan.target);
         }
@@ -157,6 +161,8 @@ ElementFrames Engine::nextFrames() noexcept
         auto& s = smoothers[(size_t) e];
         s.pitch.advance (chunkCoefficient);
         s.width.advance (chunkCoefficient);
+        s.warp.advance (chunkCoefficient);
+        s.clip.advance (chunkCoefficient);
         s.gain.advance (chunkCoefficient);
         s.pan.advance (chunkCoefficient);
 
@@ -168,6 +174,8 @@ ElementFrames Engine::nextFrames() noexcept
         f.pitchOffsetSemitones = s.pitch.current + pitchBend.current;
         f.mode = params.elements[(size_t) e].filterMode;
         f.width01 = s.width.current;
+        f.warp01 = s.warp.current;
+        f.clip01 = s.clip.current;
         f.gainL = s.gain.current * std::cos (angle) * sqrt2;
         f.gainR = s.gain.current * std::sin (angle) * sqrt2;
     }

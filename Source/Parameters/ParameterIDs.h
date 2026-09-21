@@ -22,6 +22,9 @@ namespace ParamIDs
     inline juce::String fine     (int e) { return element (e, "fine"); }
     // Added in parameter version 2.
     inline juce::String filter   (int e) { return element (e, "filter"); }
+    // Added in parameter version 3 (Clip exists on Elements 1 and 3 only).
+    inline juce::String warp     (int e) { return element (e, "warp"); }
+    inline juce::String clip     (int e) { return element (e, "clip"); }
     inline juce::String width    (int e) { return element (e, "width"); }
     inline juce::String attack   (int e) { return element (e, "attack"); }
     inline juce::String release  (int e) { return element (e, "release"); }

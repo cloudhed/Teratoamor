@@ -7,6 +7,7 @@ namespace
     // Version hint 1 = first released parameter set. Parameters added later use a higher number.
     constexpr int versionHint = 1;
     constexpr int versionHint2 = 2;   // Milestone 2: Element filter mode
+    constexpr int versionHint3 = 3;   // Milestone 2: Warp and Clip
 
     juce::ParameterID makeID (const juce::String& id, int version = versionHint)
     {
@@ -57,6 +58,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
         layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::fine (e)), prefix + "Fine (cents)",
             NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::warp (e), versionHint3), prefix + "Warp",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
+        if (e != 1)   // Element 2 has no Clip control
+            layout.add (std::make_unique<AudioParameterFloat> (
+                makeID (ParamIDs::clip (e), versionHint3), prefix + "Clip",
+                NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+                juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
         layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::width (e)), prefix + "Width",

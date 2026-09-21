@@ -2,6 +2,7 @@
 
 #include "ElementEnvelope.h"
 #include "ElementFilter.h"
+#include "ElementShaper.h"
 #include "EngineParams.h"
 #include "NoiseSource.h"
 
@@ -15,13 +16,15 @@ struct ElementFrame
     float pitchOffsetSemitones = 0.0f;
     FilterMode mode = FilterMode::bpWide;
     float width01 = 0.9f;
+    float warp01 = 0.0f;
+    float clip01 = 0.0f;
     float gainL = 0.0f;   // level x pan, left
     float gainR = 0.0f;   // level x pan, right
 };
 
 using ElementFrames = std::array<ElementFrame, EngineParams::numElements>;
 
-// One note: three Elements, each = white noise -> resonant band-pass -> envelope.
+// One note: three Elements, each = white noise -> filter -> warp/clip -> envelope.
 class Voice
 {
 public:
@@ -38,6 +41,7 @@ public:
             elements[(size_t) e].noise.seed (static_cast<std::uint64_t> (voiceIndex * 16 + e + 1));
             elements[(size_t) e].envelope.prepare (sampleRate);
             elements[(size_t) e].filter.reset();
+            elements[(size_t) e].shaper.prepare (sampleRate);
         }
 
         held = false;
@@ -103,6 +107,7 @@ public:
         {
             el.envelope.kill();
             el.filter.reset();
+            el.shaper.reset();
         }
     }
 
@@ -130,12 +135,13 @@ public:
             const float hz = 440.0f * std::exp2 ((midiNote - 69.0f) / 12.0f);
             el.filter.setMode (frame.mode);
             el.filter.setParameters (hz, ResonantBandpass::widthToQ (frame.width01), sampleRate);
+            el.shaper.setParameters (frame.warp01, frame.clip01);
 
             const float gain = targetRms * playingVelocity;
 
             for (int i = 0; i < numSamples; ++i)
             {
-                const float y = el.filter.process (el.noise.next()) * el.envelope.next() * gain;
+                const float y = el.shaper.process (el.filter.process (el.noise.next())) * el.envelope.next() * gain;
                 left[i]  += y * frame.gainL;
                 right[i] += y * frame.gainR;
             }
@@ -147,6 +153,7 @@ private:
     {
         NoiseSource noise;
         ElementFilter filter;
+        ElementShaper shaper;
         ElementEnvelope envelope;
     };
 
@@ -166,6 +173,7 @@ private:
         for (int e = 0; e < EngineParams::numElements; ++e)
         {
             elements[(size_t) e].filter.reset();
+            elements[(size_t) e].shaper.reset();
             elements[(size_t) e].envelope.noteOn (latestParams.elements[(size_t) e].attack * 0.1f);
         }
     }

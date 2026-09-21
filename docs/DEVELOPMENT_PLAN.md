@@ -106,8 +106,8 @@ Deliver the smallest useful instrument before expanding the feature set.
 ### Milestone 2: Element character
 
 - [x] Add the remaining Element filter modes: Off, Bypass, BP Narrow, Peak Wide, and Peak Narrow (new `el<N>_filter` choice parameter, version hint 2; `Source/DSP/ElementFilter.h`). Fitted to `02_filter_*.wav` at an assumed Width 90; needs a listening check and confirmation of the batch's Width settings.
-- [ ] Implement and refine Warp as an original asymmetric waveshaping stage.
-- [ ] Implement and refine Clip, including the strong Clip 100 behaviour.
+- [x] Implement Warp as an original asymmetric waveshaping stage (`Source/DSP/ElementShaper.h`; `el<N>_warp`, version hint 3, on all three Elements). Deliberately stronger than `03_warp_*.wav` after listening feedback (second harmonic -2.9 dB at Warp 100 vs -8.1 dB; fourth -26 dB vs -25 dB in the reference; squared plus rectified terms, concave curve).
+- [x] Implement Clip, including the strong Clip 100 behaviour (`el<N>_clip`, version hint 3). The VSTXML export lists Clip on Elements 1 and 3 only, so Element 2 has none. Clip 100 level, crest factor, and odd harmonics are close to `04_clip_100.wav`, but the onset is deliberately earlier than the reference (audible from about Clip 50, listening feedback), with automatic loudness compensation (Clip 100 is about +1.6 dB louder than no Clip, where the reference is about +12 dB; deliberate, listening feedback); the reference third harmonic is about 5 dB stronger and it also has a second harmonic (-27 dB) that Teratoamor lacks (unexplained).
 - [ ] Add Hold, Decay, Sustain, and Time behaviour as measurements justify it.
 - [ ] Add Element 2 and 3 Link behaviour after it is cleanly specified.
 
@@ -117,6 +117,8 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [ ] Add distortion.
 - [ ] Add two delay lines.
 - [ ] Add tempo synchronisation where required.
+- [ ] Add other types of noise.
+- [ ] Add potential way of letting user load their own noise.
 
 ### Milestone 4: modulation and performance
 

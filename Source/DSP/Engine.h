@@ -56,7 +56,7 @@ private:
 
     struct ElementSmoothers
     {
-        Smoothed pitch, width, gain, pan;
+        Smoothed pitch, width, warp, clip, gain, pan;
     };
 
     Voice* chooseVoice (int midiNote) noexcept;

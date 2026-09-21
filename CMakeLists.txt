@@ -36,6 +36,7 @@ target_sources(Teratoamor PRIVATE
     Source/DSP/EngineParams.h
     Source/DSP/ElementEnvelope.h
     Source/DSP/ElementFilter.h
+    Source/DSP/ElementShaper.h
     Source/DSP/NoiseSource.h
     Source/DSP/ResonantBandpass.h
     Source/DSP/Voice.h)

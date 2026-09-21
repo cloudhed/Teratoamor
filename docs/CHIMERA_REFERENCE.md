@@ -130,12 +130,18 @@ These descriptions identify audible targets. Filter topology and numerical imple
 - Increasing Warp primarily introduces even harmonics.
 - At Warp 100, the second harmonic is approximately 6 dB below the fundamental.
 - A suitable independent starting point is a controllable asymmetric waveshaping stage, refined with listening tests and output measurements.
+- Measured from `03_warp_*.wav` (note 60, Element 1, Width 90): second harmonic relative to the fundamental is -18.7, -14.9, -10.7, -8.1 dB at Warp 25, 50, 75, 100, roughly linear in amplitude. The fourth and sixth harmonics rise too, while odd harmonics stay weak. The recordings have no DC offset and about the same level (within 1.5 dB) as unwarped output.
+- The parameter export lists Warp on all three Elements.
 
 ## Clip observations
 
 - Values 25 through 75 are restrained at the default signal level.
 - Clip 100 behaves like strong hard clipping.
 - Clip 100 produces prominent odd harmonics and an approximately 3 dB crest factor.
+
+- Measured from `04_clip_*.wav`: Clip 25, 50, and 75 show no added harmonics (level within 2.4 dB of unclipped). Clip 100 is about 12 dB louder, peaks near -10.3 dBFS with a 3.0 dB crest factor, has a third harmonic near -13 dB, a fifth near -25 dB, and a smaller second harmonic near -27 dB.
+- The parameter export lists Clip on Elements 1 and 3 only; Element 2 has none.
+- Teratoamor implements drive (14 dB x Clip, linear) followed by a hard clip at 5.7 times the filter's RMS output, with the output scaled back by the calculated post-clip RMS (80% compensation), so Clip 100 is about +1.6 dB louder rather than the reference +12 dB. Clip 100 is fitted to the numbers above; the earlier onset (audible from about Clip 50 instead of about 90) is a deliberate departure chosen by ear.
 
 The transfer function must be independently designed and compared against behavioural recordings.
 
