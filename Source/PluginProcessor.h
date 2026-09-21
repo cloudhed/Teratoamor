@@ -47,6 +47,7 @@ private:
     struct ElementParamPointers
     {
         std::atomic<float>* enabled = nullptr;
+        std::atomic<float>* filter = nullptr;
         std::atomic<float>* octave = nullptr;
         std::atomic<float>* semitone = nullptr;
         std::atomic<float>* fine = nullptr;

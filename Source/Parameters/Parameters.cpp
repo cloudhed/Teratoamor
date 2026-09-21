@@ -1,14 +1,16 @@
 #include "Parameters.h"
 #include "ParameterIDs.h"
+#include "DSP/EngineParams.h"
 
 namespace
 {
     // Version hint 1 = first released parameter set. Parameters added later use a higher number.
     constexpr int versionHint = 1;
+    constexpr int versionHint2 = 2;   // Milestone 2: Element filter mode
 
-    juce::ParameterID makeID (const juce::String& id)
+    juce::ParameterID makeID (const juce::String& id, int version = versionHint)
     {
-        return { id, versionHint };
+        return { id, version };
     }
 
     juce::String percentText (float value, int)
@@ -20,6 +22,7 @@ namespace
 juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
 {
     using juce::AudioParameterBool;
+    using juce::AudioParameterChoice;
     using juce::AudioParameterFloat;
     using juce::AudioParameterInt;
     using juce::NormalisableRange;
@@ -38,6 +41,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
         // Reference default patch: only Element 1 sounds, Width 90, Release ~0.5 s.
         layout.add (std::make_unique<AudioParameterBool> (
             makeID (ParamIDs::enabled (e)), prefix + "On", e == 0));
+
+        // Choice order matches the FilterMode enum and is stored by hosts; never reorder it.
+        layout.add (std::make_unique<AudioParameterChoice> (
+            makeID (ParamIDs::filter (e), versionHint2), prefix + "Filter",
+            juce::StringArray { "Off", "Bypass", "BP Wide", "BP Narrow", "Peak Wide", "Peak Narrow" },
+            static_cast<int> (FilterMode::bpWide)));
 
         layout.add (std::make_unique<AudioParameterInt> (
             makeID (ParamIDs::octave (e)), prefix + "Octave", -4, 4, 0));

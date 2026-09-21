@@ -20,6 +20,8 @@ namespace ParamIDs
     inline juce::String octave   (int e) { return element (e, "octave"); }
     inline juce::String semitone (int e) { return element (e, "semitone"); }
     inline juce::String fine     (int e) { return element (e, "fine"); }
+    // Added in parameter version 2.
+    inline juce::String filter   (int e) { return element (e, "filter"); }
     inline juce::String width    (int e) { return element (e, "width"); }
     inline juce::String attack   (int e) { return element (e, "attack"); }
     inline juce::String release  (int e) { return element (e, "release"); }

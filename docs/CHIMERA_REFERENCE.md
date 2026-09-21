@@ -111,6 +111,18 @@ The implementation must clamp the denominator or maximum Q safely near Width 100
 - `Peak Wide` retains more broadband noise.
 - `BP Wide` at Width 90 measured near Q 98.
 
+Spectral measurements of `02_filter_*.wav` (44.1 kHz, note 60, Welch average; the Width used for each recording is not recorded, and Width 90 is assumed because Peak Wide's skirts match the default patch):
+
+| Mode | Level at 0.9 f0 | Level at 0.5 f0 | Level 5 kHz | Reading |
+| --- | ---: | ---: | ---: | --- |
+| BP Wide (default) | -25 dB | -42 dB | -63 dB | 2-pole band-pass, Q about 98 |
+| BP Narrow | -29 dB | -66 dB | -100 dB | 4-pole: skirts fall about twice as fast; stage Q about 29 if two identical stages |
+| Peak Wide | -23 dB | -40 dB | -48 dB | same skirts as BP Wide plus a flat noise floor about 46 dB below the peak |
+| Peak Narrow | -50 dB | -83 dB | -90 dB | 4-pole, stage Q about 80; noise floor at or below -89 dB (may be recording-limited) |
+| Bypass | n/a | n/a | n/a | flat white noise, RMS about -29 dBFS, matching the default patch level |
+
+Hypotheses implemented (labelled uncertain): Narrow modes are two cascaded band-passes with stage Q equal to 0.3 x (BP Narrow) or 0.8 x (Peak Narrow) of the Width-derived Q; Peak modes add unfiltered noise (gain 0.36 wide, 0.003 narrow, relative to unit-RMS noise); Off silences the Element. The Off behaviour is an assumption, since no recording of it exists.
+
 These descriptions identify audible targets. Filter topology and numerical implementation must be independently designed.
 
 ## Warp observations

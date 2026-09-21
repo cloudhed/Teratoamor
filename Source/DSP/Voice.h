@@ -1,9 +1,9 @@
 #pragma once
 
 #include "ElementEnvelope.h"
+#include "ElementFilter.h"
 #include "EngineParams.h"
 #include "NoiseSource.h"
-#include "ResonantBandpass.h"
 
 #include <array>
 #include <cmath>
@@ -13,6 +13,7 @@
 struct ElementFrame
 {
     float pitchOffsetSemitones = 0.0f;
+    FilterMode mode = FilterMode::bpWide;
     float width01 = 0.9f;
     float gainL = 0.0f;   // level x pan, left
     float gainR = 0.0f;   // level x pan, right
@@ -127,6 +128,7 @@ public:
             const auto& frame = frames[(size_t) e];
             const float midiNote = static_cast<float> (playingNote) + frame.pitchOffsetSemitones;
             const float hz = 440.0f * std::exp2 ((midiNote - 69.0f) / 12.0f);
+            el.filter.setMode (frame.mode);
             el.filter.setParameters (hz, ResonantBandpass::widthToQ (frame.width01), sampleRate);
 
             const float gain = targetRms * playingVelocity;
@@ -144,7 +146,7 @@ private:
     struct Element
     {
         NoiseSource noise;
-        ResonantBandpass filter;
+        ElementFilter filter;
         ElementEnvelope envelope;
     };
 

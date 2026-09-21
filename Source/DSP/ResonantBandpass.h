@@ -42,7 +42,11 @@ public:
     }
 
     // Returns the band-pass output scaled to a level-normalised result.
-    float process (float x) noexcept
+    float process (float x) noexcept { return processUnity (x) * makeUp; }
+
+    // Band-pass output with unity gain at the centre frequency (no level compensation).
+    // Used when several stages are cascaded and the compensation is applied once at the end.
+    float processUnity (float x) noexcept
     {
         const float v3 = x - ic2eq;
         const float v1 = a1 * ic1eq + a2 * v3;
@@ -56,8 +60,10 @@ public:
             return 0.0f;
         }
 
-        return k * v1 * makeUp;
+        return k * v1;
     }
+
+    float getMakeUp() const noexcept { return makeUp; }
 
 private:
     float k = 1.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f, makeUp = 1.0f;

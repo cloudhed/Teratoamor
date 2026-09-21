@@ -48,7 +48,7 @@ void Engine::setParams (const EngineParams& newParams)
 
         s.pitch.target = static_cast<float> (p.octave * 12 + p.semitone) + p.fineCents / 100.0f;
         s.width.target = std::clamp (p.width, 0.0f, 100.0f) / 100.0f;
-        s.gain.target  = p.enabled ? std::clamp (p.level, 0.0f, 100.0f) / 100.0f : 0.0f;
+        s.gain.target  = (p.enabled && p.filterMode != FilterMode::off) ? std::clamp (p.level, 0.0f, 100.0f) / 100.0f : 0.0f;
         s.pan.target   = std::clamp (p.pan, -100.0f, 100.0f) / 100.0f;
     }
 
@@ -166,6 +166,7 @@ ElementFrames Engine::nextFrames() noexcept
 
         auto& f = frames[(size_t) e];
         f.pitchOffsetSemitones = s.pitch.current + pitchBend.current;
+        f.mode = params.elements[(size_t) e].filterMode;
         f.width01 = s.width.current;
         f.gainL = s.gain.current * std::cos (angle) * sqrt2;
         f.gainR = s.gain.current * std::sin (angle) * sqrt2;

@@ -11,6 +11,7 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
     {
         auto& p = elementParams[(size_t) e];
         p.enabled  = apvts.getRawParameterValue (ParamIDs::enabled (e));
+        p.filter   = apvts.getRawParameterValue (ParamIDs::filter (e));
         p.octave   = apvts.getRawParameterValue (ParamIDs::octave (e));
         p.semitone = apvts.getRawParameterValue (ParamIDs::semitone (e));
         p.fine     = apvts.getRawParameterValue (ParamIDs::fine (e));
@@ -42,6 +43,7 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
         const auto& p = elementParams[e];
         auto& o = out.elements[e];
         o.enabled   = p.enabled->load() >= 0.5f;
+        o.filterMode = static_cast<FilterMode> (juce::jlimit (0, 5, juce::roundToInt (p.filter->load())));
         o.octave    = juce::roundToInt (p.octave->load());
         o.semitone  = juce::roundToInt (p.semitone->load());
         o.fineCents = p.fine->load();

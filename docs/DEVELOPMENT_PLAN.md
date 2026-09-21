@@ -105,7 +105,7 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Milestone 2: Element character
 
-- [ ] Add the remaining Element filter modes: Off, Bypass, BP Narrow, Peak Wide, and Peak Narrow.
+- [x] Add the remaining Element filter modes: Off, Bypass, BP Narrow, Peak Wide, and Peak Narrow (new `el<N>_filter` choice parameter, version hint 2; `Source/DSP/ElementFilter.h`). Fitted to `02_filter_*.wav` at an assumed Width 90; needs a listening check and confirmation of the batch's Width settings.
 - [ ] Implement and refine Warp as an original asymmetric waveshaping stage.
 - [ ] Implement and refine Clip, including the strong Clip 100 behaviour.
 - [ ] Add Hold, Decay, Sustain, and Time behaviour as measurements justify it.
