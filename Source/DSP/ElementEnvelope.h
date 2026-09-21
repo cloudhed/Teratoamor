@@ -1,17 +1,21 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 
-// Attack / hold / decay / sustain / release envelope for one Element.
+// Attack / decay / sustain / release envelope for one Element.
 //  - Attack follows a cubic curve (measured shape is strongly curved, roughly cubic).
-//  - Hold keeps full level for a set time, then Decay falls linearly to the sustain level.
-//    (Hold, Decay, and Sustain are provisional: no reference recordings exist for them yet.)
-//  - The caller scales the decay and release lengths by the Element's Time control (see timeScale).
+//  - Decay is a linear fall of a control value u from 1 to the Sustain setting, and the output
+//    is u raised to decayCurve. The same curve turns Sustain into a level, so Sustain 50 sits
+//    about 11 dB down. (Fitted to reference recordings to about 0.3 dB.)
 //  - Release ramps linearly from wherever the envelope was when the key was released.
 //  - A short "fade" quickly silences a voice that is being stolen, avoiding clicks.
+//  - The caller scales the decay and release lengths by the Element's Time control (see timeScale).
 class ElementEnvelope
 {
 public:
+    static constexpr float decayCurve = 1.95f;
+
     void prepare (double newSampleRate) noexcept
     {
         sampleRate = newSampleRate;
@@ -21,14 +25,14 @@ public:
 
     bool isIdle() const noexcept { return stage == Stage::Idle; }
 
-    // holdSeconds may be 0 (skipped). sustainLevel is 0..1; at 1 the decay stage is skipped.
-    void noteOn (float attackSeconds, float holdSeconds = 0.0f, float decaySeconds = 0.0f, float sustainLevel = 1.0f) noexcept
+    // sustainControl is 0..1; at 1 the decay stage is skipped.
+    void noteOn (float attackSeconds, float decaySeconds = 0.0f, float sustainControl = 1.0f) noexcept
     {
         const float sr = static_cast<float> (sampleRate);
         phaseIncrement = 1.0f / (std::max (attackSeconds, minSeconds) * sr);
-        holdSamples = holdSeconds * sr;
         decayIncrement = 1.0f / (std::max (decaySeconds, minSeconds) * sr);
-        sustain = std::clamp (sustainLevel, 0.0f, 1.0f);
+        sustain = std::clamp (sustainControl, 0.0f, 1.0f);
+        sustainLevel = std::pow (sustain, decayCurve);
         phase = 0.0f;
         level = 0.0f;
         stage = Stage::Attack;
@@ -59,21 +63,17 @@ public:
 
             case Stage::Attack:
                 phase += phaseIncrement;
-                if (phase >= 1.0f) { phase = 1.0f; startHold(); }
+                if (phase >= 1.0f) { phase = 1.0f; startDecay(); }
                 level = phase * phase * phase;
                 return level;
 
-            case Stage::Hold:
-                if (--holdSamples <= 0.0f) startDecay();
-                return level = 1.0f;
-
             case Stage::Decay:
                 phase += decayIncrement;
-                if (phase >= 1.0f) { stage = Stage::Sustain; return level = sustain; }
-                return level = 1.0f - (1.0f - sustain) * phase;
+                if (phase >= 1.0f) { stage = Stage::Sustain; return level = sustainLevel; }
+                return level = std::pow (1.0f - (1.0f - sustain) * phase, decayCurve);
 
             case Stage::Sustain:
-                return level = sustain;
+                return level = sustainLevel;
 
             case Stage::Release:
             case Stage::Fade:
@@ -86,16 +86,10 @@ public:
     }
 
 private:
-    enum class Stage { Idle, Attack, Hold, Decay, Sustain, Release, Fade };
+    enum class Stage { Idle, Attack, Decay, Sustain, Release, Fade };
 
     static constexpr float minSeconds  = 0.002f;
     static constexpr float fadeSeconds = 0.005f;
-
-    void startHold() noexcept
-    {
-        if (holdSamples > 0.0f) stage = Stage::Hold;
-        else                    startDecay();
-    }
 
     void startDecay() noexcept
     {
@@ -114,5 +108,5 @@ private:
     double sampleRate = 44100.0;
     Stage stage = Stage::Idle;
     float level = 0.0f, phase = 0.0f, phaseIncrement = 0.0f, rampStart = 0.0f;
-    float holdSamples = 0.0f, decayIncrement = 0.0f, sustain = 1.0f;
+    float decayIncrement = 0.0f, sustain = 1.0f, sustainLevel = 1.0f;
 };

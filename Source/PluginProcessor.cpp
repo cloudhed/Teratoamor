@@ -19,7 +19,6 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
         p.clip     = e == 1 ? nullptr : apvts.getRawParameterValue (ParamIDs::clip (e));
         p.width    = apvts.getRawParameterValue (ParamIDs::width (e));
         p.time     = apvts.getRawParameterValue (ParamIDs::time (e));
-        p.hold     = apvts.getRawParameterValue (ParamIDs::hold (e));
         p.decay    = apvts.getRawParameterValue (ParamIDs::decay (e));
         p.sustain  = apvts.getRawParameterValue (ParamIDs::sustain (e));
         p.attack   = apvts.getRawParameterValue (ParamIDs::attack (e));
@@ -57,7 +56,6 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
         o.clip      = p.clip != nullptr ? p.clip->load() : 0.0f;
         o.width     = p.width->load();
         o.time      = p.time->load();
-        o.hold      = p.hold->load();
         o.decay     = p.decay->load();
         o.sustain   = p.sustain->load();
         o.attack    = p.attack->load();

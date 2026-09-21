@@ -17,10 +17,9 @@ enum class FilterMode
 // Plain-data snapshot of the user-facing controls, read once per audio block.
 // It has no JUCE dependency, so the DSP can be tested without a plugin host.
 // The Decay and Release lengths are multiplied by this factor (Time 50 = unchanged).
-// Provisional: fitted to recordings at Time 0, 50 and 100. Release tails measured about
+// Fitted to recordings at Time 0, 50 and 100. Release tails measured about
 // 0.05 s, 0.45 s and 0.8 s at the default Release, and about 0, 2.3 s and 4.7 s at Release 25;
-// a Decay 50 / Sustain 0 note faded in about 0.5 s at Time 0. No difference in onset was assumed,
-// and Hold is left unscaled because nothing measures it.
+// a Decay 50 / Sustain 0 note faded in about 0.5 s at Time 0. No difference in onset was assumed.
 inline float timeScale (float timeControl) noexcept
 {
     return std::max (timeControl / 50.0f, 0.1f);   // Time 0 is not zero: about a tenth of normal
@@ -37,8 +36,7 @@ struct ElementParams
     float clip     = 0.0f;     // 0..100 (Element 2 has no Clip control)
     float width    = 90.0f;    // 0..100
     float time     = 50.0f;    // 0..100: Decay and Release length. 50 = normal, 0 = nearly instant, 100 = twice as long
-    float hold     = 0.0f;     // 0..100 (10 units = 1 second)
-    float decay    = 5.0f;     // 0..100 (10 units = 1 second)
+    float decay    = 0.0f;     // 0..100 (about 0.104 seconds per unit)
     float sustain  = 100.0f;   // 0..100 (percent of full level)
     float attack   = 0.0f;     // 0..100 (control value; 10 units = 1 second)
     float release  = 5.0f;     // 0..100

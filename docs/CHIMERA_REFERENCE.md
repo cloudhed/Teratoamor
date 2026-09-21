@@ -35,7 +35,7 @@ Chimera creates pitched sounds by feeding white noise through pitch-controlled r
 - Octave and semitone tuning
 - Warp
 - Clip on applicable Elements
-- Hold, Attack, Decay, Sustain, Release, and Time controls
+- Hold, Attack, Decay, Sustain, Release, and Time controls (Teratoamor omits Hold)
 - Per-Element pan and volume
 - Link controls for Elements 2 and 3
 - A global multimode filter
@@ -162,14 +162,19 @@ Additional observations:
 - The Attack shape is strongly curved, approximately cubic rather than a linear gain ramp.
 - Full reference recordings are available locally for later clean-room measurement.
 
-Time (`07_time_000.wav`, `07_time_100.wav`, with the default recording as Time 50; everything else default): pitch (MIDI 60.05, 59.92, 60.01) and spectral skirts are unchanged. The release tail measures roughly 0.05 s, 0.45 s, and 0.8 s at Time 0, 50, and 100, about a Time/50 multiplier on the 0.5 s default Release. The Time 100 file also has a soft onset (about 0.1 s), assumed to be MIDI keypress timing rather than Time. Further recordings (`07_time_{000,050,100}_release_025.wav` and `07_time_{000,050,100}_decay_050_sustain_000.wav`): with Release 25 the tail scales the same way (about 0, 2.3 s, 4.7 s at Time 0, 50, 100), so Time is a multiplier of about Time/50 on Release. With Decay 50 and Sustain 0 the note fades away in about 0.5 s at Time 0, and is still fading at about 3.5 s (Time 50) and about 4 s (Time 100), where the key was presumably released; fitted linear decay lengths are about 0.45 s, 3-3.5 s, and 6-7 s, so Time scales Decay by the same factor and Decay 50 is about 3.3 s, not 5 s. The level readings are noisy (about +/-30% from the narrowband resonator), so the decay shape (linear versus exponential) is not settled. Not yet known: whether Time affects Attack or Hold.
+Default envelope settings: Hold 0, Attack 0, Decay 0, Sustain 100, Release 5, Time 50.
 
-Hold, Decay, and Sustain on their own (listed per Element in the VSTXML export) have no recordings yet; Decay was only seen through the Time recordings above. The factory program data is an opaque binary chunk and was not decoded. Teratoamor's Hold, Decay, and Sustain are provisional assumptions. Recordings that would settle this (default patch, Element 1, note 60, held about 12 seconds, then released; change one control at a time):
+Time (`07_time_*.wav`, with the default recording as Time 50; everything else default): pitch (MIDI 60.05, 59.92, 60.01) and spectral skirts are unchanged. The release tail measures roughly 0.05 s, 0.45 s, and 0.8 s at Time 0, 50, and 100, about a Time/50 multiplier on the 0.5 s default Release. With Release 25 the tail scales the same way (about 0, 2.3 s, 4.7 s), so Time multiplies Release by about Time/50. The Time 100 file also has a soft onset (about 0.1 s), assumed to be MIDI keypress timing rather than Time. With Decay 50 and Sustain 0 the note fades away in about 0.5 s at Time 0, so Time scales Decay by the same factor (about 0.1 at Time 0).
 
-- `07_hold_025/050/075/100`: Hold only.
-- `08_decay_025/050/075/100`: Decay only, with Sustain 0 and Hold 0.
-- `09_sustain_000/025/050/075`: Sustain only, with Decay about 50.
-- Time with Hold at 50 (to see whether Time scales Hold), and the decay shape with the note held about 12 seconds so the whole fall is visible.
+Decay and Sustain (`09_decay_*.wav`, `10_sustain_*.wav`, `11_combined_d030_s040.wav`; Filter Bypass so the level is steady white noise, default Time 50):
+
+- Decay length is linear in the control: with Sustain 0 the note fades to silence in 2.6, 5.2, 7.8, and 10.4 s at Decay 25, 50, 75, and 100, or 0.104 s per unit.
+- The amplitude during Decay follows (1 - t/T)^p, with p between 1.85 and 2.0 (about 0.25 dB RMS fit error). Equivalent view: a control value u falls linearly from 1 to the Sustain setting, and the output is u^p.
+- Sustain settles at that same power law: 25, 40, 50, and 75 settle at -22.6, -14.9, -11.0, and -4.3 dB relative to the first half second (which already includes a little decay), about Sustain^1.95 in amplitude.
+- The time to reach the sustain level is the Decay time regardless of the Sustain value (Sustain 25, 50, and 75 with Decay 25 all settle at about 2.6 s).
+- Hold above 0 did not play at all in the reference (reported from the user's testing), so it was not measured and Teratoamor has no Hold control.
+
+The factory program data is an opaque binary chunk and was not decoded. Not yet measured: whether Time affects Attack, and the exact Release curve shape.
 
 ## Measurement practice
 

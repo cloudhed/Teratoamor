@@ -25,9 +25,8 @@ namespace ParamIDs
     // Added in parameter version 3 (Clip exists on Elements 1 and 3 only).
     inline juce::String warp     (int e) { return element (e, "warp"); }
     inline juce::String clip     (int e) { return element (e, "clip"); }
-    // Added in parameter version 4 (provisional envelope stages).
+    // Added in parameter version 4 (envelope stages).
     inline juce::String time     (int e) { return element (e, "time"); }
-    inline juce::String hold     (int e) { return element (e, "hold"); }
     inline juce::String decay    (int e) { return element (e, "decay"); }
     inline juce::String sustain  (int e) { return element (e, "sustain"); }
     inline juce::String width    (int e) { return element (e, "width"); }
