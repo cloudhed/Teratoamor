@@ -40,7 +40,8 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // Output peak of the last block (0..1 per channel), written by the audio thread for a level meter.
+    // Maximum output magnitude since the editor last consumed it (may exceed 1 at clipping).
+    // The audio thread accumulates; the GUI exchanges with zero. Never persisted in patch state.
     std::atomic<float> outputPeakLeft { 0.0f }, outputPeakRight { 0.0f };
 
 private:

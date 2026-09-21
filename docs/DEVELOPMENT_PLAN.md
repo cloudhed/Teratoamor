@@ -134,7 +134,8 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Milestone 4: modulation and performance
 
-- [x] Add six modulation sections (`Source/DSP/Modulation.h`, `mod<N>_*` and `master_pan`, version hint 10; `TeratoamorModulationTests`). No editor controls yet: they are reachable through host parameters only. Modulation 1-3 are per-note Attack/Decay/Sustain/Release/Time envelopes (same fitted timing as Elements), 4-6 are tempo-synced oscillators (Off plus 17 wavetables, Soft, Rate 1/64T to 4/1 default 1/16, Gate Trig). Every section has a target dropdown and a bipolar Depth (-100..100); the target lists follow the user's research (envelopes: Elements, All, Filter; oscillators add Distort, Delay, Modulation 1-3 Depth, other oscillators' Rate, Master). Design decisions:
+- [x] Add six modulation sections (`Source/DSP/Modulation.h`, `mod<N>_*` and `master_pan`, version hint 10; `TeratoamorModulationTests`). Editor controls are available through the Modulation (Env) and Modulation (Osc) workspaces. Modulation 1-3 are per-note Attack/Decay/Sustain/Release/Time envelopes (same fitted timing as Elements), 4-6 are tempo-synced oscillators (Off plus 17 wavetables, Soft, Rate 1/64T to 4/1 default 1/16, Gate Trig). Every section has a target dropdown and a bipolar Depth (-100..100); the target lists follow the user's research (envelopes: Elements, All, Filter; oscillators add Distort, Delay, Modulation 1-3 Depth, other oscillators' Rate, Master). Design decisions:
+  - Editor: envelopes 1-3 are grouped side by side with vertical stage sliders in Modulation (Env); oscillators 4-6 are grouped side by side in Modulation (Osc).
   - Per note: envelopes and Gate Trig oscillators run per voice for Element and All targets. Filter, Distort, Delay, Master and Rate/Depth targets cannot be per voice, so they follow the newest sounding note (or the free-running oscillators alone when nothing sounds). Gate Trig off uses one free-running oscillator per section.
   - Depth scale: the user measured 0.48 semitones per unit on the original (Depth 25 = an octave, 100 = four octaves) but found Depth 100 unplayably extreme on Pitch, so Pitch is scaled to 0.36 semitones per unit (100 = three octaves; the old Depth 75). Every other target moves one control unit per Depth unit (Depth 100 can sweep the whole control); Rate moves 4 octaves per 100 units. Oscillators are bipolar (-1..1) and envelopes 0..1, both times Depth.
   - Soft is a one-pole smoother with a time constant proportional to the period (0.2 x period at Soft 100). Fitted by design, not measured.
@@ -143,14 +144,16 @@ Deliver the smallest useful instrument before expanding the feature set.
   - Modulation cannot revive an Element that is off or in Off mode (Volume). Old saved projects load with Depth 0 and Wave Off.
 - [ ] Add MIDI routing and aftertouch.
 - [x] Add Glide (`master_glide`, 0..100, version hint 11): every new note slides in a straight line (in semitones) from the previously played note's pitch to its own, in 0 to 2 seconds (Glide 100 = 2 s); 0 is off, and it applies to every note, not only legato. Chosen by design and open to tuning by ear: legato-only mode, an exponential slide, or a different maximum time.
-- [x] Add tempo Sync (`master_sync`, default on) and a manual tempo (`master_bpm`, 20..400, default 120). Sync on uses the host tempo when the host gives one, otherwise the manual tempo; Sync off always uses the manual tempo. Delay Rates and modulation Rates use it. The editor greys the tempo slider while Sync is on.
-- [x] Feed a master output peak meter (`outputPeakLeft/Right` on the processor, updated each block). No meter is drawn yet; that belongs to the designed GUI.
+- [x] Add tempo Sync (`master_sync`, default on) and a manual tempo (`master_bpm`, 20..400, default 120). Sync on uses the host tempo when the host gives one, otherwise the manual tempo; Sync off always uses the manual tempo. Delay Rates and modulation Rates use it. The editor dims the manual tempo with Sync on but leaves it editable as the fallback when the host supplies no tempo.
+- [x] Feed and draw a master stereo output peak meter beside Master in the persistent GUI header. `outputPeakLeft/Right` accumulate block peaks until consumed by the 30 Hz GUI timer, with decay and a clip indicator.
 - [ ] MIDI section (later patch): Pitchbend Range (currently fixed at +/-2 semitones in `Engine::pitchBendRangeSemitones`), four CC slots (CC number, target, Depth -100..100) and Aftertouch with a target and Depth. The modulation targets and per-chunk `units` array are the intended framework: CC and aftertouch values can add to the same units as the six sections, so no restructuring is needed. Leave room for this section in the designed GUI.
 - [x] Add master pan (`master_pan`, -100..100, same constant-power law as the Elements). Remaining master controls: to be decided.
 
 ### Milestone 5: product finish
 
 - [ ] Design and implement a polished, original Teratoamor GUI.
+  - [x] Initial scalable editor based on the cleaner mockup: reusable Element panels, embedded logo, Global / Modulation (Env) / Modulation (Osc) / Space workspace, all implemented parameter controls, and persistent Master/meter header. See `gui/Teratoamor_GUI_Design.md` for current overrides and layout editing points.
+  - [ ] Human visual/interaction review in Cubase, Windows display scaling, and subsequent design polish. Preset management and MIDI mapping remain separate future work.
 - [ ] Create original Teratoamor presets without Chimera preset compatibility or copied names.
 - [ ] Complete DAW compatibility, state, automation, performance, and long-run stability testing.
 - [ ] Audit licences, notices, packaging, and the clean-room boundary before distribution.

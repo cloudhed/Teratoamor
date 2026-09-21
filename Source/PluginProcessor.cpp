@@ -77,11 +77,15 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
 void TeratoamorAudioProcessor::prepareToPlay (double sampleRate, int)
 {
     engine.prepare (sampleRate);
+    outputPeakLeft.store (0.0f);
+    outputPeakRight.store (0.0f);
 }
 
 void TeratoamorAudioProcessor::releaseResources()
 {
     engine.reset();
+    outputPeakLeft.store (0.0f);
+    outputPeakRight.store (0.0f);
 }
 
 EngineParams TeratoamorAudioProcessor::readParams() const noexcept
@@ -215,9 +219,17 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     midiMessages.clear();
 
-    // Peak meter feed (a level meter in the designed GUI will read these).
-    outputPeakLeft.store (buffer.getMagnitude (0, 0, numSamples));
-    outputPeakRight.store (buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, numSamples) : outputPeakLeft.load());
+    // Preserve short transients between GUI ticks. Atomic max tolerates the GUI
+    // consuming a peak concurrently, without locks or allocations on this thread.
+    static_assert (std::atomic<float>::is_always_lock_free);
+    const auto publishPeak = [] (std::atomic<float>& destination, float peak)
+    {
+        auto previous = destination.load (std::memory_order_relaxed);
+        while (previous < peak && ! destination.compare_exchange_weak (previous, peak, std::memory_order_relaxed)) {}
+    };
+    const auto leftPeak = buffer.getMagnitude (0, 0, numSamples);
+    publishPeak (outputPeakLeft, leftPeak);
+    publishPeak (outputPeakRight, buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, numSamples) : leftPeak);
 }
 
 double TeratoamorAudioProcessor::getTailLengthSeconds() const

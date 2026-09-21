@@ -9,6 +9,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # JUCE is pinned as a Git submodule and is never modified.
 add_subdirectory(external/JUCE)
 
+juce_add_binary_data(TeratoamorAssets
+    HEADER_NAME TeratoamorAssets.h
+    NAMESPACE TeratoamorAssets
+    SOURCES gui/gui_designs/icon_voidpetal_smaller_margins.png)
+
 juce_add_plugin(Teratoamor
     PRODUCT_NAME "Teratoamor"
     COMPANY_NAME "Teratoamor Project"
@@ -28,6 +33,10 @@ target_sources(Teratoamor PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/ui/Theme.h
+    Source/ui/Theme.cpp
+    Source/ui/EditorContent.h
+    Source/ui/EditorContent.cpp
     Source/Parameters/ParameterIDs.h
     Source/Parameters/Parameters.cpp
     Source/Parameters/Parameters.h
@@ -54,6 +63,7 @@ target_compile_definitions(Teratoamor PUBLIC
 
 target_link_libraries(Teratoamor
     PRIVATE
+        TeratoamorAssets
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
@@ -79,3 +89,12 @@ add_test(NAME DelayTests COMMAND TeratoamorDelayTests)
 add_executable(TeratoamorModulationTests Tests/ModulationTests.cpp Source/DSP/Engine.cpp)
 target_include_directories(TeratoamorModulationTests PRIVATE Source)
 add_test(NAME ModulationTests COMMAND TeratoamorModulationTests)
+
+# Render and exercise the real editor without opening a desktop window or audio device.
+if(WIN32)
+    juce_add_console_app(TeratoamorEditorTests PRODUCT_NAME "Teratoamor Editor Tests")
+    target_sources(TeratoamorEditorTests PRIVATE Tests/EditorTests.cpp)
+    target_include_directories(TeratoamorEditorTests PRIVATE Source)
+    target_link_libraries(TeratoamorEditorTests PRIVATE Teratoamor juce::juce_audio_utils juce::juce_dsp)
+    add_test(NAME EditorTests COMMAND TeratoamorEditorTests "${CMAKE_BINARY_DIR}/gui-previews")
+endif()

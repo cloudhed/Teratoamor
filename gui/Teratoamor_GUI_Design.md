@@ -1,8 +1,74 @@
 # Teratoamor GUI Design Specification
 
-**Document status:** Design target for later JUCE implementation  
+**Document status:** Design target with an initial JUCE implementation (September 2026)
 **Product:** Teratoamor 64-bit VST3 synthesizer  
 **Purpose:** Give human contributors, Codex, and Claude Code a single reference for the plugin editor’s structure, controls, appearance, interaction rules, and implementation boundaries.
+
+---
+
+## Current implementation and overrides
+
+The cleaner mockup is the visual reference. The initial working editor uses the
+embedded PNG glyph, procedurally drawn panels and controls, three permanently
+visible Elements, and a lower workspace with **Global / Modulation (Env) /
+Modulation (Osc) / Space** tabs.
+Master and the stereo output meter are together in the permanent top bar, as
+requested. Tempo and host sync also remain visible. The meter reads accumulated
+output peaks at 30 Hz, falls by 36 dB/second, and displays a 1.5-second CLIP label.
+It is a sample-peak meter, not a true-peak or loudness meter.
+
+The processor supersedes older inventory details below:
+
+- There is no Hold. Elements have Attack, Decay, Sustain, Release and Time.
+- Element 2 has no Clip. Linked Elements use Element 1's envelope, including its
+  graph; their stored local envelope controls are dimmed and disabled.
+- Distortion has Bypass / Drive, Drive and Tone. Delay has one shared Cut.
+- Modulation (Env) shows envelopes 1–3 side by side, with vertical A/D/S/R/Time
+  sliders, a small shape preview and Depth for each. Modulation (Osc) shows
+  oscillators 4–6 side by side. All controls remain attached when hidden;
+  navigation never alters parameters.
+- Space retains shared delay Mix/Cut on the left, stacks Delay 1 above Delay 2
+  in the middle, and reserves the rightmost panel for future Reverb. Reverb has
+  no controls, parameters or audio processing yet.
+- The current active coral is brighter peach-coral `#F5A399`, chosen visually
+  from the supplied swatch. Warm toggle outlines retain `#D67A7B`. General borders
+  use 1.6 logical pixels, accent outlines 2, and knob arcs 4–6.
+- Parameter readouts retain processor units (including 0–100 control values).
+  They do not claim those values are Hz, dB, seconds or Q factors. Envelope plots
+  show a normalised shape with an illustrative sustain duration, not live voices.
+- Manual BPM remains editable with sync enabled because it is also the fallback
+  when no host tempo is available, including the standalone application.
+- Preset management, A/B, MIDI assignments and live voice/MIDI activity are future
+  work. The first editor does not display nonfunctional controls for them.
+
+### Adjusting the layout
+
+- `Source/ui/Theme.h`: palette, reference canvas, window limits, region heights,
+  padding, gaps, and Element proportions.
+- `Source/ui/Theme.cpp`: shared knobs, sliders, toggles, tabs and focus styling.
+- `Source/ui/EditorContent.cpp`: reusable parameter controls and panel classes.
+  `ElementPanel::resized()` controls the Element arrangement; the local ID/label
+  arrays control its inventory. `ControlPanel` lays out processing controls.
+  `ModEnvelopePanel` and `ModOscillatorPanel` lay out individual modulation slots;
+  `SpacePanel` controls the delay/reverb proportions and `DelayChannelPanel` the
+  compact delay rows. Related size ratios are in `Theme.h`.
+  `EditorContent::resized()` controls the overall region order.
+- `Source/PluginEditor.cpp`: uniform canvas scaling and the host resize constraint.
+
+The reference canvas is 1600 × 1000; the initial window is 1440 × 900, with a
+1200 × 750 minimum and 2400 × 1500 maximum. JUCE handles display DPI separately.
+The UI uses the system sans-serif font and needs no new font or library licence.
+Only the logo is a bitmap; panel geometry and control positions are independent.
+Drag the window corner to resize. Knobs support Shift for fine movement, editable
+value text, keyboard adjustment and double-click to restore the parameter default.
+Mouse-wheel parameter changes are disabled.
+
+`TeratoamorEditorTests` exercises all parameter attachments in both directions,
+linked envelopes, state restoration, tab navigation without patch changes,
+meter consumption and visible component bounds. It renders every workspace at
+minimum/default/maximum sizes, including all six grouped modulation editors, into the ignored
+`build/gui-previews/` directory. Visual review complements the bounds checks.
+Interactive Cubase validation and Windows display-scale checks remain manual.
 
 ---
 
