@@ -1,0 +1,19 @@
+# Compiled project files
+/build/
+/out/
+
+# Local VS Code settings
+/.vscode/
+
+# Visual Studio files
+*.user
+*.suo
+*.VC.db
+*.opendb
+
+# Operating-system clutter
+.DS_Store
+Thumbs.db
+
+# Private reference plugins and recordings
+/reference/
