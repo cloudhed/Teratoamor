@@ -176,11 +176,77 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
         }
     }
 
-    setSize (4 * margin + 3 * panelWidth,
+    modulation.group.setText ("Modulation");
+    addAndMakeVisible (modulation.group);
+    for (int m = 0; m < ParamIDs::numMods; ++m)
+        modulation.select.addItem ("Modulation " + juce::String (m + 1) + (m < 3 ? " (envelope)" : " (oscillator)"), m + 1);
+    addAndMakeVisible (modulation.select);
+    for (auto* box : { &modulation.target, &modulation.wave, &modulation.rate })
+        addChildComponent (box);
+    addChildComponent (modulation.gate);
+    addAndMakeVisible (modulation.target);
+    modulation.masterPan = std::make_unique<SliderRow> (state, ParamIDs::masterPan, "Master Pan");
+    addAndMakeVisible (modulation.masterPan->label);
+    addAndMakeVisible (modulation.masterPan->slider);
+    modulation.select.onChange = [this] { showModulationSection (modulation.select.getSelectedId() - 1); };
+    modulation.select.setSelectedId (1, juce::dontSendNotification);
+    showModulationSection (0);
+
+    setSize (5 * margin + 4 * panelWidth,
              titleHeight + 2 * (filterStripHeight + margin) + delayHeight + margin + groupTopPadding + linesPerPanel * rowHeight + 3 * margin);
 
     refreshLinkState();
     startTimerHz (10);   // picks up Link changes made by the host (automation, session load)
+}
+
+void TeratoamorAudioProcessorEditor::showModulationSection (int section)
+{
+    auto& state = processor.apvts;
+    auto& m = modulation;
+    m.section = section;
+
+    // Drop the old attachments before the controls they point at are reused.
+    m.targetAttachment.reset(); m.waveAttachment.reset(); m.rateAttachment.reset(); m.gateAttachment.reset();
+    m.rows.clear();
+    m.target.clear (juce::dontSendNotification);
+    m.wave.clear (juce::dontSendNotification);
+    m.rate.clear (juce::dontSendNotification);
+
+    const auto fill = [&state] (juce::ComboBox& box, const juce::String& id)
+    {
+        if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (id)))
+            box.addItemList (choice->choices, 1);
+    };
+    const auto addRow = [this, &state, &m, section] (const char* name, const char* text)
+    {
+        m.rows.push_back (std::make_unique<SliderRow> (state, ParamIDs::mod (section, name), text));
+        addAndMakeVisible (m.rows.back()->label);
+        addAndMakeVisible (m.rows.back()->slider);
+    };
+
+    fill (m.target, ParamIDs::mod (section, "target"));
+    m.targetAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::mod (section, "target"), m.target);
+    addRow ("depth", "Depth");
+
+    const bool oscillator = section >= 3;
+    m.wave.setVisible (oscillator); m.rate.setVisible (oscillator); m.gate.setVisible (oscillator);
+
+    if (oscillator)
+    {
+        fill (m.wave, ParamIDs::mod (section, "wave"));
+        fill (m.rate, ParamIDs::mod (section, "rate"));
+        m.waveAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::mod (section, "wave"), m.wave);
+        m.rateAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::mod (section, "rate"), m.rate);
+        m.gateAttachment = std::make_unique<ButtonAttachment> (state, ParamIDs::mod (section, "gate"), m.gate);
+        addRow ("soft", "Soft");
+    }
+    else
+    {
+        addRow ("attack", "Attack"); addRow ("decay", "Decay"); addRow ("sustain", "Sustain");
+        addRow ("release", "Release"); addRow ("time", "Time");
+    }
+
+    resized();
 }
 
 void TeratoamorAudioProcessorEditor::refreshLinkState()
@@ -312,4 +378,26 @@ void TeratoamorAudioProcessorEditor::resized()
         for (auto& row : panel.envelope)
             placeRow (nextLine(), row.get());
     }
+
+    // Modulation column: selector, target, then the section's controls.
+    auto column = area.removeFromLeft (panelWidth);
+    modulation.group.setBounds (column);
+    auto inner = column.reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto nextLine = [&inner] { return inner.removeFromTop (rowHeight); };
+    modulation.select.setBounds (nextLine().reduced (0, 2));
+    modulation.target.setBounds (nextLine().reduced (0, 2));
+
+    if (modulation.section >= 3)
+    {
+        auto line = nextLine();
+        modulation.wave.setBounds (line.removeFromLeft (line.getWidth() / 2).reduced (0, 2).withTrimmedRight (margin / 2));
+        modulation.rate.setBounds (line.reduced (0, 2).withTrimmedLeft (margin / 2));
+        modulation.gate.setBounds (nextLine());
+    }
+
+    for (auto& row : modulation.rows)
+        placeRow (nextLine(), row.get());
+
+    inner.removeFromTop (margin);
+    placeRow (nextLine(), modulation.masterPan.get());
 }

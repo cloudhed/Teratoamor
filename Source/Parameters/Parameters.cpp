@@ -161,5 +161,53 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
             makeID (ParamIDs::delayPan (d), 9), prefix + "Pan", NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
     }
 
+    // Master pan and the six modulation sections (parameter version 10).
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::masterPan, 10), "Master Pan", NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+
+    const juce::StringArray waves { "Off", "Sine", "Triangle", "Saw", "Peak", "Dip", "Hump", "RipSaw1", "RipSaw2", "Ramp",
+                                    "RipRamp1", "RipRamp2", "SharkR", "SharkL", "Pulse100%", "Pulse50%", "Pulse25%", "Random" };
+    jassert (waves.size() == static_cast<int> (ModWave::count));
+
+    for (int m = 0; m < ParamIDs::numMods; ++m)
+    {
+        const auto prefix = "Modulation " + juce::String (m + 1) + " ";
+        const auto id = [m] (const char* name) { return makeID (ParamIDs::mod (m, name), 10); };
+        const auto units = NormalisableRange<float> (0.0f, 100.0f, 0.1f);
+
+        // The choice index refers to this section's own list (see ModTargets::listFor).
+        const auto targets = ModTargets::listFor (m);
+        const auto defaultTarget = m == 3 ? ModTarget::el1Pitch : ModTarget::el1Width;
+        juce::StringArray targetNames;
+        int defaultIndex = 0;
+
+        for (int i = 0; i < targets.size; ++i)
+        {
+            targetNames.add (ModTargets::names[(size_t) targets.items[(size_t) i]]);
+            if (targets.items[(size_t) i] == defaultTarget)
+                defaultIndex = i;
+        }
+
+        layout.add (std::make_unique<AudioParameterChoice> (id ("target"), prefix + "Target", targetNames, defaultIndex));
+        layout.add (std::make_unique<AudioParameterFloat> (
+            id ("depth"), prefix + "Depth", NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+
+        if (m < 3)
+        {
+            layout.add (std::make_unique<AudioParameterFloat> (id ("attack"), prefix + "Attack", units, 0.0f));
+            layout.add (std::make_unique<AudioParameterFloat> (id ("decay"), prefix + "Decay", units, 0.0f));
+            layout.add (std::make_unique<AudioParameterFloat> (id ("sustain"), prefix + "Sustain", units, 100.0f));
+            layout.add (std::make_unique<AudioParameterFloat> (id ("release"), prefix + "Release", units, 5.0f));
+            layout.add (std::make_unique<AudioParameterFloat> (id ("time"), prefix + "Time", units, 50.0f));
+        }
+        else
+        {
+            layout.add (std::make_unique<AudioParameterChoice> (id ("wave"), prefix + "Wave", waves, 0));
+            layout.add (std::make_unique<AudioParameterBool> (id ("gate"), prefix + "Gate Trig", false));
+            layout.add (std::make_unique<AudioParameterFloat> (id ("soft"), prefix + "Soft", units, 0.0f));
+            layout.add (std::make_unique<AudioParameterChoice> (id ("rate"), prefix + "Rate", rates, 7));
+        }
+    }
+
     return layout;
 }

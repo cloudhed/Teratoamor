@@ -4,6 +4,7 @@
 #include "GlobalFilter.h"
 #include "Distortion.h"
 #include "ParallelDelay.h"
+#include "Modulation.h"
 #include "Voice.h"
 
 #include <array>
@@ -72,8 +73,11 @@ private:
     EngineParams params;
     std::array<Voice, numVoices> voices;
     std::array<ElementSmoothers, EngineParams::numElements> smoothers;
-    Smoothed master, pitchBend;
+    Smoothed master, masterPan, pitchBend;
     Smoothed filterCutoff, filterQ;   // global filter knobs, 0..1
+    Modulation::FreeOscillators freeOscillators;   // sections with Gate Trig off
+    Modulation::VoiceState idleMods;               // modulation when no note is sounding
+    std::array<float, 3> freeRateUnits {};         // last chunk's Rate modulation of Modulation 4-6
     GlobalFilter globalFilter;
     Distortion distortion;
     ParallelDelay delay;

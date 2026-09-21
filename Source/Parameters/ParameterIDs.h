@@ -26,6 +26,12 @@ namespace ParamIDs
     inline juce::String delayDecay (int d) { return "delay" + juce::String (d + 1) + "_decay"; }
     inline juce::String delayPan (int d) { return "delay" + juce::String (d + 1) + "_pan"; }
 
+    // Added in parameter version 10: master pan and the six modulation sections ("mod<N>_<name>", N is 1..6).
+    // Sections 1-3 are envelopes (attack, decay, sustain, release, time); 4-6 are oscillators (wave, gate, soft, rate).
+    constexpr int numMods = 6;
+    inline const juce::String masterPan { "master_pan" };
+    inline juce::String mod (int m, const char* name) { return "mod" + juce::String (m + 1) + "_" + name; }
+
     // Per-Element IDs are "el<N>_<name>", where N is 1..3.
     inline juce::String element (int elementIndex, const char* name)
     {

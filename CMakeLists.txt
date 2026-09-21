@@ -40,6 +40,7 @@ target_sources(Teratoamor PRIVATE
     Source/DSP/ElementEnvelope.h
     Source/DSP/ElementFilter.h
     Source/DSP/ElementShaper.h
+    Source/DSP/Modulation.h
     Source/DSP/NoiseSource.h
     Source/DSP/ResonantBandpass.h
     Source/DSP/Voice.h)
@@ -74,3 +75,7 @@ target_include_directories(TeratoamorWidthRenderer PRIVATE Source)
 add_executable(TeratoamorDelayTests Tests/DelayTests.cpp Source/DSP/Engine.cpp)
 target_include_directories(TeratoamorDelayTests PRIVATE Source)
 add_test(NAME DelayTests COMMAND TeratoamorDelayTests)
+
+add_executable(TeratoamorModulationTests Tests/ModulationTests.cpp Source/DSP/Engine.cpp)
+target_include_directories(TeratoamorModulationTests PRIVATE Source)
+add_test(NAME ModulationTests COMMAND TeratoamorModulationTests)

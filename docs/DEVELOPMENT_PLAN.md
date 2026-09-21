@@ -134,10 +134,16 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Milestone 4: modulation and performance
 
-- [ ] Add six modulation sections with an original, maintainable routing design.
+- [x] Add six modulation sections (`Source/DSP/Modulation.h`, `mod<N>_*` and `master_pan`, version hint 10; `TeratoamorModulationTests`). No editor controls yet: they are reachable through host parameters only. Modulation 1-3 are per-note Attack/Decay/Sustain/Release/Time envelopes (same fitted timing as Elements), 4-6 are tempo-synced oscillators (Off plus 17 wavetables, Soft, Rate 1/64T to 4/1 default 1/16, Gate Trig). Every section has a target dropdown and a bipolar Depth (-100..100); the target lists follow the user's research (envelopes: Elements, All, Filter; oscillators add Distort, Delay, Modulation 1-3 Depth, other oscillators' Rate, Master). Design decisions:
+  - Per note: envelopes and Gate Trig oscillators run per voice for Element and All targets. Filter, Distort, Delay, Master and Rate/Depth targets cannot be per voice, so they follow the newest sounding note (or the free-running oscillators alone when nothing sounds). Gate Trig off uses one free-running oscillator per section.
+  - Depth scale: the user measured 0.48 semitones per unit on the original (Depth 25 = an octave, 100 = four octaves) but found Depth 100 unplayably extreme on Pitch, so Pitch is scaled to 0.36 semitones per unit (100 = three octaves; the old Depth 75). Every other target moves one control unit per Depth unit (Depth 100 can sweep the whole control); Rate moves 4 octaves per 100 units. Oscillators are bipolar (-1..1) and envelopes 0..1, both times Depth.
+  - Soft is a one-pole smoother with a time constant proportional to the period (0.2 x period at Soft 100). Fitted by design, not measured.
+  - Wavetable shapes are guesses from their names and the user's screenshots (Saw rises, Pulse100% is a full-swing square starting positive, Random is stepped sample-and-hold). From the wavetable icons: Sine/Triangle start at zero and rise, Saw rises, Ramp falls, Pulse100% is half high/half low starting high, Pulse50% and Pulse25% are high for 75% and 87.5% of the cycle, Hump is a positive-only arch. Still approximations (icons hard to read): Peak, Dip, RipSaw/RipRamp, SharkR/L.
+  - Modulation is applied after the parameter smoothers so fast modulation is not blurred, but Distortion and Delay smooth their own inputs (about 10 ms), which softens very fast modulation of those two.
+  - Modulation cannot revive an Element that is off or in Off mode (Volume). Old saved projects load with Depth 0 and Wave Off.
 - [ ] Add MIDI routing and aftertouch.
 - [ ] Add glide.
-- [ ] Add master pan and remaining master controls.
+- [x] Add master pan (`master_pan`, -100..100, same constant-power law as the Elements). Remaining master controls: to be decided.
 
 ### Milestone 5: product finish
 

@@ -19,6 +19,31 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
     distortionCrushParam = apvts.getRawParameterValue (ParamIDs::distortionCrush);
     distortionToneParam = apvts.getRawParameterValue (ParamIDs::distortionTone);
     masterLevelParam = apvts.getRawParameterValue (ParamIDs::masterLevel);
+    masterPanParam = apvts.getRawParameterValue (ParamIDs::masterPan);
+
+    for (int m = 0; m < ParamIDs::numMods; ++m)
+    {
+        auto& p = modParams[(size_t) m];
+        const auto find = [this, m] (const char* name) { return apvts.getRawParameterValue (ParamIDs::mod (m, name)); };
+        p.target = find ("target");
+        p.depth = find ("depth");
+
+        if (m < 3)
+        {
+            p.attack = find ("attack");
+            p.decay = find ("decay");
+            p.sustain = find ("sustain");
+            p.release = find ("release");
+            p.time = find ("time");
+        }
+        else
+        {
+            p.wave = find ("wave");
+            p.gate = find ("gate");
+            p.soft = find ("soft");
+            p.rate = find ("rate");
+        }
+    }
     filterTypeParam = apvts.getRawParameterValue (ParamIDs::filterType);
     filterCutoffParam = apvts.getRawParameterValue (ParamIDs::filterCutoff);
     filterQParam = apvts.getRawParameterValue (ParamIDs::filterQ);
@@ -69,6 +94,32 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
     out.distortion = { distortionCrushParam->load(), distortionToneParam->load(),
         static_cast<DistortionType> (juce::jlimit (0, 1, juce::roundToInt (distortionTypeParam->load()))) };
     out.master = masterLevelParam->load();
+    out.masterPan = masterPanParam->load();
+
+    for (size_t m = 0; m < modParams.size(); ++m)
+    {
+        const auto& p = modParams[m];
+        auto& o = out.mods[m];
+        const auto targets = ModTargets::listFor (static_cast<int> (m));
+        o.target = targets.items[(size_t) juce::jlimit (0, targets.size - 1, juce::roundToInt (p.target->load()))];
+        o.depth = p.depth->load();
+
+        if (m < 3)
+        {
+            o.attack = p.attack->load();
+            o.decay = p.decay->load();
+            o.sustain = p.sustain->load();
+            o.release = p.release->load();
+            o.time = p.time->load();
+        }
+        else
+        {
+            o.wave = static_cast<ModWave> (juce::jlimit (0, static_cast<int> (ModWave::count) - 1, juce::roundToInt (p.wave->load())));
+            o.gateTrig = p.gate->load() >= 0.5f;
+            o.soft = p.soft->load();
+            o.rate = juce::jlimit (0, static_cast<int> (DelayRates::values.size()) - 1, juce::roundToInt (p.rate->load()));
+        }
+    }
     out.globalFilter.type = static_cast<GlobalFilterType> (juce::jlimit (0, 5, juce::roundToInt (filterTypeParam->load())));
     out.globalFilter.cutoff = filterCutoffParam->load();
     out.globalFilter.q = filterQParam->load();
@@ -219,6 +270,13 @@ void TeratoamorAudioProcessor::setStateInformation (const void* data, int sizeIn
                 parameter.setProperty ("value", value, nullptr);
                 state.addChild (parameter, -1, nullptr);
             };
+            addMissing (ParamIDs::masterPan, 0.0f);
+            for (int m = 0; m < ParamIDs::numMods; ++m)
+            {
+                addMissing (ParamIDs::mod (m, "depth"), 0.0f);   // Depth 0 (and Wave Off) keeps old patches unmodulated
+                if (m >= 3)
+                    addMissing (ParamIDs::mod (m, "wave"), 0.0f);
+            }
             addMissing (ParamIDs::delayMix, 25.0f);
             addMissing (ParamIDs::delayCut, 50.0f);
             for (int d = 0; d < 2; ++d)

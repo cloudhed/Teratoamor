@@ -4,6 +4,7 @@
 #include "ElementFilter.h"
 #include "ElementShaper.h"
 #include "EngineParams.h"
+#include "Modulation.h"
 #include "NoiseSource.h"
 
 #include <array>
@@ -18,8 +19,9 @@ struct ElementFrame
     float width01 = 0.9f;
     float warp01 = 0.0f;
     float clip01 = 0.0f;
-    float gainL = 0.0f;   // level x pan, left
-    float gainR = 0.0f;   // level x pan, right
+    float level01 = 0.0f;   // smoothed Level (already 0 when the Element is off)
+    float pan = 0.0f;       // -1..1
+    bool active = false;    // Element on and not in Off filter mode: modulation may not revive it
 };
 
 using ElementFrames = std::array<ElementFrame, EngineParams::numElements>;
@@ -29,7 +31,7 @@ class Voice
 {
 public:
     static constexpr int   maxChunk = 16;               // control-rate update interval (samples)
-    static constexpr float decaySecondsPerUnit = 0.104f; // measured: Decay 100 lasts 10.4 s at Time 50
+    static constexpr float decaySecondsPerUnit = ElementEnvelope::decaySecondsPerUnit;
     static constexpr float targetRms = 0.15f;           // level of one full-scale Element before gain
 
     void prepare (double newSampleRate, int voiceIndex) noexcept
@@ -45,6 +47,7 @@ public:
             elements[(size_t) e].shaper.prepare (sampleRate);
         }
 
+        mods.prepare (sampleRate, voiceIndex);
         held = false;
         hasPending = false;
     }
@@ -60,6 +63,8 @@ public:
 
         return false;
     }
+
+    const Modulation::VoiceState& getMods() const noexcept { return mods; }
 
     bool isHeld() const noexcept          { return held; }
     int getNote() const noexcept          { return note; }
@@ -101,6 +106,8 @@ public:
             const auto& p = params.elements[(size_t) e];
             elements[(size_t) e].envelope.noteOff (p.release * 0.1f * timeScale (p.time));
         }
+
+        mods.noteOff (params);
     }
 
     void kill() noexcept
@@ -113,10 +120,13 @@ public:
             el.filter.reset();
             el.shaper.reset();
         }
+        mods.kill();
     }
 
     // Adds up to maxChunk samples of this voice into left/right.
-    void render (float* left, float* right, int numSamples, const ElementFrames& frames) noexcept
+    // frames are the smoothed knob values; this voice's modulation is added on top of them.
+    void render (float* left, float* right, int numSamples, const ElementFrames& frames,
+                 const EngineParams& params, const std::array<float, 3>& freeOscillators) noexcept
     {
         if (hasPending && allEnvelopesIdle())
         {
@@ -127,6 +137,9 @@ public:
         if (! isActive())
             return;
 
+        mods.update (numSamples, params, freeOscillators, true);
+        const auto& units = mods.get();
+
         for (int e = 0; e < EngineParams::numElements; ++e)
         {
             auto& el = elements[(size_t) e];
@@ -134,20 +147,35 @@ public:
             if (el.envelope.isIdle())
                 continue;
 
+            using Modulation::Kind;
+            using Modulation::elementUnits;
             const auto& frame = frames[(size_t) e];
-            const float midiNote = static_cast<float> (playingNote) + frame.pitchOffsetSemitones;
+            const float pitch = frame.pitchOffsetSemitones + elementUnits (units, e, Kind::pitch) * Modulation::pitchSemitonesPerUnit;
+            const float width = std::clamp (frame.width01 + elementUnits (units, e, Kind::width) * 0.01f, 0.0f, 1.0f);
+            const float warp  = std::clamp (frame.warp01  + elementUnits (units, e, Kind::warp)  * 0.01f, 0.0f, 1.0f);
+            const float clip  = std::clamp (frame.clip01  + elementUnits (units, e, Kind::clip)  * 0.01f, 0.0f, 1.0f);
+            const float level = frame.active ? std::clamp (frame.level01 + elementUnits (units, e, Kind::volume) * 0.01f, 0.0f, 1.0f)
+                                             : frame.level01;
+            const float pan   = std::clamp (frame.pan + elementUnits (units, e, Kind::pan) * 0.01f, -1.0f, 1.0f);
+
+            // Constant-power pan, scaled so the centre position has unity gain in each channel.
+            const float angle = (pan + 1.0f) * (3.14159265359f * 0.25f);
+            const float gainL = level * std::cos (angle) * 1.41421356f;
+            const float gainR = level * std::sin (angle) * 1.41421356f;
+
+            const float midiNote = static_cast<float> (playingNote) + pitch;
             const float hz = 440.0f * std::exp2 ((midiNote - 69.0f) / 12.0f);
             el.filter.setMode (frame.mode);
-            el.filter.setParameters (hz, frame.width01, sampleRate);
-            el.shaper.setParameters (frame.warp01, frame.clip01);
+            el.filter.setParameters (hz, width, sampleRate);
+            el.shaper.setParameters (warp, clip);
 
             const float gain = targetRms * playingVelocity;
 
             for (int i = 0; i < numSamples; ++i)
             {
                 const float y = el.shaper.process (el.filter.process (el.noise.next())) * el.envelope.next() * gain;
-                left[i]  += y * frame.gainL;
-                right[i] += y * frame.gainR;
+                left[i]  += y * gainL;
+                right[i] += y * gainR;
             }
         }
     }
@@ -173,6 +201,7 @@ private:
     {
         playingNote = note;
         playingVelocity = velocity;
+        mods.noteOn (latestParams);
 
         for (int e = 0; e < EngineParams::numElements; ++e)
         {
@@ -192,4 +221,5 @@ private:
     std::uint64_t age = 0;
     bool held = false, hasPending = false;
     EngineParams latestParams;
+    Modulation::VoiceState mods;
 };

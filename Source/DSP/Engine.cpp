@@ -21,6 +21,9 @@ void Engine::prepare (double newSampleRate)
         voices[(size_t) v].prepare (sampleRate, v);
 
     globalFilter.reset();
+    freeOscillators.prepare (sampleRate);
+    idleMods.prepare (sampleRate, numVoices);
+    freeRateUnits.fill (0.0f);
     distortion.prepare (sampleRate);
     delay.prepare (sampleRate);
     noteCounter = 0;
@@ -35,6 +38,9 @@ void Engine::reset()
     releaseDeferred.fill (false);
     sustainDown = false;
     pitchBend.snap (0.0f);
+    freeOscillators.reset();
+    idleMods.kill();
+    freeRateUnits.fill (0.0f);
     distortion.reset();
     delay.reset();
     globalFilter.reset();
@@ -64,6 +70,7 @@ void Engine::setParams (const EngineParams& newParams)
     }
 
     master.target = std::clamp (params.master, 0.0f, 100.0f) / 100.0f;
+    masterPan.target = std::clamp (params.masterPan, -100.0f, 100.0f) / 100.0f;
     filterCutoff.target = std::clamp (params.globalFilter.cutoff, 0.0f, 100.0f) / 100.0f;
     filterQ.target = std::clamp (params.globalFilter.q, 0.0f, 100.0f) / 100.0f;
 
@@ -83,6 +90,7 @@ void Engine::setParams (const EngineParams& newParams)
     if (snapOnNextParams)
     {
         master.snap (master.target);
+        masterPan.snap (masterPan.target);
         pitchBend.snap (pitchBend.target);
         filterCutoff.snap (filterCutoff.target);
         filterQ.snap (filterQ.target);
@@ -194,18 +202,15 @@ ElementFrames Engine::nextFrames() noexcept
         s.gain.advance (chunkCoefficient);
         s.pan.advance (chunkCoefficient);
 
-        // Constant-power pan, scaled so the centre position has unity gain in each channel.
-        const float angle = (s.pan.current + 1.0f) * (pi * 0.25f);
-        const float sqrt2 = 1.41421356f;
-
         auto& f = frames[(size_t) e];
         f.pitchOffsetSemitones = s.pitch.current + pitchBend.current;
         f.mode = params.elements[(size_t) e].filterMode;
         f.width01 = s.width.current;
         f.warp01 = s.warp.current;
         f.clip01 = s.clip.current;
-        f.gainL = s.gain.current * std::cos (angle) * sqrt2;
-        f.gainR = s.gain.current * std::sin (angle) * sqrt2;
+        f.level01 = s.gain.current;
+        f.pan = s.pan.current;
+        f.active = params.elements[(size_t) e].enabled && f.mode != FilterMode::off;
     }
 
     return frames;
@@ -221,24 +226,63 @@ void Engine::render (float* left, float* right, int numSamples)
         const int n = std::min (Voice::maxChunk, numSamples - start);
         const auto frames = nextFrames();
         master.advance (chunkCoefficient);
+        masterPan.advance (chunkCoefficient);
+
+        freeOscillators.advance (params, freeRateUnits, n);
 
         for (auto& v : voices)
-            v.render (left + start, right + start, n, frames);
+            v.render (left + start, right + start, n, frames, params, freeOscillators.get());
+
+        // Effects and Master cannot be modulated per note: they follow the newest sounding note,
+        // or the free-running oscillators alone when nothing is sounding.
+        const Voice* newest = nullptr;
+
+        for (const auto& v : voices)
+            if (v.isActive() && (newest == nullptr || v.getAge() > newest->getAge()))
+                newest = &v;
+
+        if (newest == nullptr)
+            idleMods.update (n, params, freeOscillators.get(), false);
+
+        const auto& mod = newest != nullptr ? newest->getMods().get() : idleMods.get();
+
+        for (size_t k = 0; k < freeRateUnits.size(); ++k)
+            freeRateUnits[k] = mod[Modulation::idx (ModTarget::mod4Rate) + k];
+
+        using Modulation::idx;
+        const auto units = [&mod] (ModTarget t) { return mod[idx (t)]; };
 
         // Global filter on the summed Elements, before the master level.
         filterCutoff.advance (chunkCoefficient);
         filterQ.advance (chunkCoefficient);
-        globalFilter.setParameters (params.globalFilter.type, filterCutoff.current, filterQ.current, sampleRate);
+        globalFilter.setParameters (params.globalFilter.type,
+                                    std::clamp (filterCutoff.current + units (ModTarget::filterCutoff) * 0.01f, 0.0f, 1.0f),
+                                    std::clamp (filterQ.current + units (ModTarget::filterQ) * 0.01f, 0.0f, 1.0f), sampleRate);
         globalFilter.process (left + start, right + start, n);
 
+        distortion.setParameters (params.distortion.crush + units (ModTarget::distortCrush),
+                                  params.distortion.tone + units (ModTarget::distortTone), params.distortion.type);
         distortion.process (left + start, right + start, n);
+
+        auto delayParams = params.delay;
+        delayParams.cut += units (ModTarget::delayFilter);
+        for (auto& line : delayParams.lines)
+            line.pan += units (ModTarget::delayPan);
+        delay.setParameters (delayParams);
         delay.process (left + start, right + start, n);
 
-        // Master level, then a hard safety clamp that also removes any NaN/infinity.
+        // Master level and pan (same constant-power law as the Elements), then a hard safety
+        // clamp that also removes any NaN/infinity.
+        const float level = std::clamp (master.current + units (ModTarget::masterVolume) * 0.01f, 0.0f, 1.0f);
+        const float panPosition = std::clamp (masterPan.current + units (ModTarget::masterPan) * 0.01f, -1.0f, 1.0f);
+        const float angle = (panPosition + 1.0f) * (pi * 0.25f);
+        const float gainL = level * std::cos (angle) * 1.41421356f;
+        const float gainR = level * std::sin (angle) * 1.41421356f;
+
         for (int i = start; i < start + n; ++i)
         {
-            const float l = left[i] * master.current;
-            const float r = right[i] * master.current;
+            const float l = left[i] * gainL;
+            const float r = right[i] * gainR;
             left[i]  = std::abs (l) < 1.0f ? l : (l > 0.0f ? 1.0f : (l < 0.0f ? -1.0f : 0.0f));
             right[i] = std::abs (r) < 1.0f ? r : (r > 0.0f ? 1.0f : (r < 0.0f ? -1.0f : 0.0f));
         }

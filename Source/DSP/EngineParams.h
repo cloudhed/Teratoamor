@@ -90,11 +90,101 @@ struct DelayParams
     std::array<DelayLineParams, 2> lines;
 };
 
+// Everything a modulation section can drive. The order is stored by nothing (hosts store each
+// section's choice index, see ModTargets::listFor), but keep it stable anyway.
+enum class ModTarget
+{
+    el1Width = 0, el1Pitch, el1Pan, el1Warp, el1Clip,
+    el2Width, el2Pitch, el2Pan, el2Warp,
+    el3Width, el3Pitch, el3Pan, el3Warp,
+    allWidth, allPitch, allPan, allVolume, allWarp,
+    distortCrush, distortTone,
+    filterCutoff, filterQ,
+    delayPan, delayFilter,
+    mod1Depth, mod2Depth, mod3Depth,
+    mod4Rate, mod5Rate, mod6Rate,
+    masterPan, masterVolume,
+    count
+};
+
+// Oscillator wavetables for Modulation 4-6. Host choice order: never reorder.
+enum class ModWave
+{
+    off = 0, sine, triangle, saw, peak, dip, hump, ripSaw1, ripSaw2, ramp,
+    ripRamp1, ripRamp2, sharkR, sharkL, pulse100, pulse50, pulse25, random,
+    count
+};
+
+namespace ModTargets
+{
+    inline constexpr int count = static_cast<int> (ModTarget::count);
+    inline constexpr std::array<const char*, count> names {{
+        "Element1 Width", "Element1 Pitch", "Element1 Pan", "Element1 Warp", "Element1 Clip",
+        "Element2 Width", "Element2 Pitch", "Element2 Pan", "Element2 Warp",
+        "Element3 Width", "Element3 Pitch", "Element3 Pan", "Element3 Warp",
+        "All Width", "All Pitch", "All Pan", "All Volume", "All Warp",
+        "Distort Drive", "Distort Tone", "Filter Cutoff", "Filter Q",
+        "Delay Pan", "Delay Filter",
+        "Modulation1 Depth", "Modulation2 Depth", "Modulation3 Depth",
+        "Modulation4 Rate", "Modulation5 Rate", "Modulation6 Rate",
+        "Master Pan", "Master Volume" }};
+
+    // The dropdown of one section (0..2 = envelopes, 3..5 = oscillators). The host stores an
+    // index into this list, so the order must not change once released.
+    struct List
+    {
+        std::array<ModTarget, count> items {};
+        int size = 0;
+    };
+
+    inline List listFor (int section) noexcept
+    {
+        List list;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto t = static_cast<ModTarget> (i);
+
+            if (section < 3)   // envelopes: Elements, All, Filter
+            {
+                if (t == ModTarget::distortCrush || t == ModTarget::distortTone)
+                    continue;
+                if (i > static_cast<int> (ModTarget::filterQ))
+                    break;
+            }
+            else if (i == static_cast<int> (ModTarget::mod4Rate) + (section - 3))
+            {
+                continue;   // an oscillator cannot modulate its own Rate
+            }
+
+            list.items[(size_t) list.size++] = t;
+        }
+        return list;
+    }
+}
+
+// One modulation section. Sections 0..2 are envelopes (attack..time), 3..5 are oscillators
+// (wave, gate, soft, rate). Depth is -100..100 and is shared by both kinds.
+struct ModParams
+{
+    ModTarget target = ModTarget::el1Width;
+    float depth = 0.0f;
+
+    float attack = 0.0f, decay = 0.0f, sustain = 100.0f, release = 5.0f, time = 50.0f;   // 0..100, as Elements
+
+    ModWave wave = ModWave::off;
+    bool gateTrig = false;   // restart the wave on every note-on; otherwise free-running
+    float soft = 0.0f;       // 0..100 smoothing of the wave
+    int rate = 7;            // index into DelayRates::values; 7 = 1/16
+};
+
 struct EngineParams
 {
     static constexpr int numElements = 3;
+    static constexpr int numMods = 6;
 
     float master = 70.0f;      // 0..100
+    float masterPan = 0.0f;    // -100..100
+    std::array<ModParams, numMods> mods;
     std::array<ElementParams, numElements> elements;
     GlobalFilterParams globalFilter;
     DistortionParams distortion;

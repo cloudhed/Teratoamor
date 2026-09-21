@@ -81,6 +81,23 @@ private:
     std::atomic<float>* distortionCrushParam = nullptr;
     std::atomic<float>* distortionToneParam = nullptr;
     std::atomic<float>* masterLevelParam = nullptr;
+    std::atomic<float>* masterPanParam = nullptr;
+
+    struct ModParamPointers
+    {
+        std::atomic<float>* target = nullptr;
+        std::atomic<float>* depth = nullptr;
+        std::atomic<float>* attack = nullptr;    // envelopes (sections 1-3)
+        std::atomic<float>* decay = nullptr;
+        std::atomic<float>* sustain = nullptr;
+        std::atomic<float>* release = nullptr;
+        std::atomic<float>* time = nullptr;
+        std::atomic<float>* wave = nullptr;      // oscillators (sections 4-6)
+        std::atomic<float>* gate = nullptr;
+        std::atomic<float>* soft = nullptr;
+        std::atomic<float>* rate = nullptr;
+    };
+    std::array<ModParamPointers, ParamIDs::numMods> modParams;
     std::atomic<float>* filterTypeParam = nullptr;
     std::atomic<float>* filterCutoffParam = nullptr;
     std::atomic<float>* filterQParam = nullptr;
