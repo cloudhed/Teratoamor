@@ -176,6 +176,8 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
         }
     }
 
+    masterGroup.setText ("Master");
+    addAndMakeVisible (masterGroup);
     modulation.group.setText ("Modulation");
     addAndMakeVisible (modulation.group);
     for (int m = 0; m < ParamIDs::numMods; ++m)
@@ -188,6 +190,22 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
     modulation.masterPan = std::make_unique<SliderRow> (state, ParamIDs::masterPan, "Master Pan");
     addAndMakeVisible (modulation.masterPan->label);
     addAndMakeVisible (modulation.masterPan->slider);
+    modulation.glide = std::make_unique<SliderRow> (state, ParamIDs::glide, "Glide");
+    modulation.tempoBpm = std::make_unique<SliderRow> (state, ParamIDs::tempoBpm, "Tempo");
+    for (auto* row : { modulation.glide.get(), modulation.tempoBpm.get() })
+    {
+        addAndMakeVisible (row->label);
+        addAndMakeVisible (row->slider);
+    }
+    modulation.glide->slider.setTooltip ("Each new note slides from the previous note's pitch. 0 is off, 100 is about 2 seconds.");
+    modulation.tempoBpm->slider.setTooltip ("Tempo used when Sync is off, or when the host gives none. Drives delay and modulation Rates.");
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (ParamIDs::glideMode)))
+        modulation.glideMode.addItemList (choice->choices, 1);
+    addAndMakeVisible (modulation.glideMode);
+    modulation.glideModeAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::glideMode, modulation.glideMode);
+    modulation.glideMode.setTooltip ("Time: every jump takes the same time. Rate: bigger jumps take longer (Glide 100 = 2 s per octave).");
+    addAndMakeVisible (modulation.tempoSync);
+    modulation.tempoSyncAttachment = std::make_unique<ButtonAttachment> (state, ParamIDs::tempoSync, modulation.tempoSync);
     modulation.select.onChange = [this] { showModulationSection (modulation.select.getSelectedId() - 1); };
     modulation.select.setSelectedId (1, juce::dontSendNotification);
     showModulationSection (0);
@@ -274,6 +292,12 @@ void TeratoamorAudioProcessorEditor::refreshLinkState()
 
 void TeratoamorAudioProcessorEditor::timerCallback()
 {
+    // The manual tempo is greyed out while Sync is on.
+    const bool synced = processor.apvts.getRawParameterValue (ParamIDs::tempoSync)->load() >= 0.5f;
+    modulation.tempoBpm->slider.setEnabled (! synced);
+    modulation.tempoBpm->label.setEnabled (! synced);
+    modulation.tempoBpm->slider.setAlpha (synced ? 0.35f : 1.0f);
+    modulation.tempoBpm->label.setAlpha (synced ? 0.35f : 1.0f);
     refreshLinkState();
 }
 
@@ -288,9 +312,6 @@ void TeratoamorAudioProcessorEditor::resized()
 
     auto top = area.removeFromTop (titleHeight - margin);
     title.setBounds (top.removeFromLeft (300));
-    auto masterArea = top.removeFromRight (360);
-    master->label.setBounds (masterArea.removeFromLeft (labelWidth));
-    master->slider.setBounds (masterArea);
 
     area.removeFromTop (margin);
 
@@ -381,8 +402,9 @@ void TeratoamorAudioProcessorEditor::resized()
 
     // Modulation column: selector, target, then the section's controls.
     auto column = area.removeFromLeft (panelWidth);
-    modulation.group.setBounds (column);
-    auto inner = column.reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto modulationArea = column.removeFromTop (groupTopPadding + 8 * rowHeight + 8);   // selector, target, Depth, up to 5 more
+    modulation.group.setBounds (modulationArea);
+    auto inner = modulationArea.reduced (margin, 0).withTrimmedTop (groupTopPadding);
     auto nextLine = [&inner] { return inner.removeFromTop (rowHeight); };
     modulation.select.setBounds (nextLine().reduced (0, 2));
     modulation.target.setBounds (nextLine().reduced (0, 2));
@@ -398,6 +420,16 @@ void TeratoamorAudioProcessorEditor::resized()
     for (auto& row : modulation.rows)
         placeRow (nextLine(), row.get());
 
-    inner.removeFromTop (margin);
-    placeRow (nextLine(), modulation.masterPan.get());
+    // Master group under the Modulation controls: level, pan, glide, tempo.
+    column.removeFromTop (margin);
+    masterGroup.setBounds (column.removeFromTop (groupTopPadding + 5 * rowHeight + 6));
+    auto masterInner = masterGroup.getBounds().reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto nextMasterLine = [&masterInner] { return masterInner.removeFromTop (rowHeight); };
+    placeRow (nextMasterLine(), master.get());
+    placeRow (nextMasterLine(), modulation.masterPan.get());
+    auto glideLine = nextMasterLine();
+    modulation.glideMode.setBounds (glideLine.removeFromRight (70).reduced (0, 2));
+    placeRow (glideLine, modulation.glide.get());
+    modulation.tempoSync.setBounds (nextMasterLine());
+    placeRow (nextMasterLine(), modulation.tempoBpm.get());
 }

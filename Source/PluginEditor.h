@@ -65,7 +65,11 @@ private:
         juce::ComboBox select, target, wave, rate;
         juce::ToggleButton gate { "Gate Trig" };
         std::vector<std::unique_ptr<SliderRow>> rows;   // Depth first, then the section's other sliders
-        std::unique_ptr<SliderRow> masterPan;
+        std::unique_ptr<SliderRow> masterPan, glide, tempoBpm;
+        juce::ComboBox glideMode;   // Time or Rate
+        std::unique_ptr<ComboBoxAttachment> glideModeAttachment;
+        juce::ToggleButton tempoSync { "Sync to host tempo" };
+        std::unique_ptr<ButtonAttachment> tempoSyncAttachment;
         std::unique_ptr<ComboBoxAttachment> targetAttachment, waveAttachment, rateAttachment;
         std::unique_ptr<ButtonAttachment> gateAttachment;
         int section = 0;
@@ -96,6 +100,7 @@ private:
     std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
     std::array<ElementPanel, ParamIDs::numElements> panels;
     ModulationPanel modulation;
+    juce::GroupComponent masterGroup;   // Master level, Pan, Glide, Sync and Tempo
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TeratoamorAudioProcessorEditor)
 };

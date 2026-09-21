@@ -165,6 +165,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
     layout.add (std::make_unique<AudioParameterFloat> (
         makeID (ParamIDs::masterPan, 10), "Master Pan", NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
 
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::glide, 11), "Glide", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f));
+    layout.add (std::make_unique<AudioParameterChoice> (
+        makeID (ParamIDs::glideMode, 11), "Glide Mode", juce::StringArray { "Time", "Rate" }, 0));
+    layout.add (std::make_unique<AudioParameterBool> (makeID (ParamIDs::tempoSync, 11), "Tempo Sync", true));
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::tempoBpm, 11), "Tempo (BPM)", NormalisableRange<float> (20.0f, 400.0f, 1.0f), 120.0f));
+
     const juce::StringArray waves { "Off", "Sine", "Triangle", "Saw", "Peak", "Dip", "Hump", "RipSaw1", "RipSaw2", "Ramp",
                                     "RipRamp1", "RipRamp2", "SharkR", "SharkL", "Pulse100%", "Pulse50%", "Pulse25%", "Random" };
     jassert (waves.size() == static_cast<int> (ModWave::count));

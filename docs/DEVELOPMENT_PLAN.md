@@ -142,7 +142,10 @@ Deliver the smallest useful instrument before expanding the feature set.
   - Modulation is applied after the parameter smoothers so fast modulation is not blurred, but Distortion and Delay smooth their own inputs (about 10 ms), which softens very fast modulation of those two.
   - Modulation cannot revive an Element that is off or in Off mode (Volume). Old saved projects load with Depth 0 and Wave Off.
 - [ ] Add MIDI routing and aftertouch.
-- [ ] Add glide.
+- [x] Add Glide (`master_glide`, 0..100, version hint 11): every new note slides in a straight line (in semitones) from the previously played note's pitch to its own, in 0 to 2 seconds (Glide 100 = 2 s); 0 is off, and it applies to every note, not only legato. Chosen by design and open to tuning by ear: legato-only mode, an exponential slide, or a different maximum time.
+- [x] Add tempo Sync (`master_sync`, default on) and a manual tempo (`master_bpm`, 20..400, default 120). Sync on uses the host tempo when the host gives one, otherwise the manual tempo; Sync off always uses the manual tempo. Delay Rates and modulation Rates use it. The editor greys the tempo slider while Sync is on.
+- [x] Feed a master output peak meter (`outputPeakLeft/Right` on the processor, updated each block). No meter is drawn yet; that belongs to the designed GUI.
+- [ ] MIDI section (later patch): Pitchbend Range (currently fixed at +/-2 semitones in `Engine::pitchBendRangeSemitones`), four CC slots (CC number, target, Depth -100..100) and Aftertouch with a target and Depth. The modulation targets and per-chunk `units` array are the intended framework: CC and aftertouch values can add to the same units as the six sections, so no restructuring is needed. Leave room for this section in the designed GUI.
 - [x] Add master pan (`master_pan`, -100..100, same constant-power law as the Elements). Remaining master controls: to be decided.
 
 ### Milestone 5: product finish

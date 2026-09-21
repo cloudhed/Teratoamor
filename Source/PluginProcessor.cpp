@@ -20,6 +20,10 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
     distortionToneParam = apvts.getRawParameterValue (ParamIDs::distortionTone);
     masterLevelParam = apvts.getRawParameterValue (ParamIDs::masterLevel);
     masterPanParam = apvts.getRawParameterValue (ParamIDs::masterPan);
+    glideParam = apvts.getRawParameterValue (ParamIDs::glide);
+    glideModeParam = apvts.getRawParameterValue (ParamIDs::glideMode);
+    tempoSyncParam = apvts.getRawParameterValue (ParamIDs::tempoSync);
+    tempoBpmParam = apvts.getRawParameterValue (ParamIDs::tempoBpm);
 
     for (int m = 0; m < ParamIDs::numMods; ++m)
     {
@@ -95,6 +99,8 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
         static_cast<DistortionType> (juce::jlimit (0, 1, juce::roundToInt (distortionTypeParam->load()))) };
     out.master = masterLevelParam->load();
     out.masterPan = masterPanParam->load();
+    out.glide = glideParam->load();
+    out.glideByRate = glideModeParam->load() >= 0.5f;
 
     for (size_t m = 0; m < modParams.size(); ++m)
     {
@@ -164,10 +170,12 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     auto* left  = buffer.getWritePointer (0);
     auto* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : left;
 
-    double bpm = 120.0;
-    if (auto* hostPlayHead = getPlayHead())
-        if (const auto position = hostPlayHead->getPosition())
-            if (const auto tempo = position->getBpm()) bpm = *tempo;
+    // Tempo: the host's when Sync is on and the host reports one, otherwise the manual BPM.
+    double bpm = tempoBpmParam->load();
+    if (tempoSyncParam->load() >= 0.5f)
+        if (auto* hostPlayHead = getPlayHead())
+            if (const auto position = hostPlayHead->getPosition())
+                if (const auto tempo = position->getBpm()) bpm = *tempo;
     hostBpm.store (DelayRates::validBpm (bpm));
     if (resetEngineOnNextBlock.exchange (false)) engine.reset();
     engine.setParams (readParams());
@@ -206,6 +214,10 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         engine.render (left + rendered, right + rendered, numSamples - rendered);
 
     midiMessages.clear();
+
+    // Peak meter feed (a level meter in the designed GUI will read these).
+    outputPeakLeft.store (buffer.getMagnitude (0, 0, numSamples));
+    outputPeakRight.store (buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, numSamples) : outputPeakLeft.load());
 }
 
 double TeratoamorAudioProcessor::getTailLengthSeconds() const
@@ -271,6 +283,10 @@ void TeratoamorAudioProcessor::setStateInformation (const void* data, int sizeIn
                 state.addChild (parameter, -1, nullptr);
             };
             addMissing (ParamIDs::masterPan, 0.0f);
+            addMissing (ParamIDs::glide, 0.0f);
+            addMissing (ParamIDs::glideMode, 0.0f);
+            addMissing (ParamIDs::tempoSync, 1.0f);   // old projects always followed the host tempo
+            addMissing (ParamIDs::tempoBpm, 120.0f);
             for (int m = 0; m < ParamIDs::numMods; ++m)
             {
                 addMissing (ParamIDs::mod (m, "depth"), 0.0f);   // Depth 0 (and Wave Off) keeps old patches unmodulated

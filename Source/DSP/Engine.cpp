@@ -27,6 +27,7 @@ void Engine::prepare (double newSampleRate)
     distortion.prepare (sampleRate);
     delay.prepare (sampleRate);
     noteCounter = 0;
+    lastNote = -1;
     snapOnNextParams = true;
 }
 
@@ -137,7 +138,8 @@ void Engine::noteOn (int midiNote, float velocity01)
     if (auto* v = chooseVoice (midiNote))
     {
         releaseDeferred[(size_t) (v - voices.data())] = false;
-        v->noteOn (midiNote, std::clamp (velocity01, 0.0f, 1.0f), ++noteCounter, params);
+        v->noteOn (midiNote, std::clamp (velocity01, 0.0f, 1.0f), ++noteCounter, params, lastNote);
+        lastNote = midiNote;
     }
 }
 

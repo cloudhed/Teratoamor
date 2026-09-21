@@ -30,6 +30,11 @@ namespace ParamIDs
     // Sections 1-3 are envelopes (attack, decay, sustain, release, time); 4-6 are oscillators (wave, gate, soft, rate).
     constexpr int numMods = 6;
     inline const juce::String masterPan { "master_pan" };
+    // Parameter version 11: Glide, and tempo Sync with a manual BPM used when Sync is off (or the host gives no tempo).
+    inline const juce::String glide { "master_glide" };
+    inline const juce::String glideMode { "master_glide_mode" };   // Time or Rate
+    inline const juce::String tempoSync { "master_sync" };
+    inline const juce::String tempoBpm { "master_bpm" };
     inline juce::String mod (int m, const char* name) { return "mod" + juce::String (m + 1) + "_" + name; }
 
     // Per-Element IDs are "el<N>_<name>", where N is 1..3.

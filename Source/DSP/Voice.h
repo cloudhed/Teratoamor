@@ -71,9 +71,11 @@ public:
     std::uint64_t getAge() const noexcept { return age; }
 
     // If the voice is already sounding it is faded out quickly and the new note starts afterwards.
-    void noteOn (int newNote, float newVelocity, std::uint64_t newAge, const EngineParams& params) noexcept
+    // glideFromNote is the previously played note (-1 for none); see EngineParams::glide.
+    void noteOn (int newNote, float newVelocity, std::uint64_t newAge, const EngineParams& params, int glideFromNote = -1) noexcept
     {
         note = newNote;
+        pendingGlideFrom = glideFromNote;
         velocity = newVelocity;
         age = newAge;
         held = true;
@@ -140,6 +142,11 @@ public:
         mods.update (numSamples, params, freeOscillators, true);
         const auto& units = mods.get();
 
+        // Glide: a constant-time slide (in semitones) from the previous note to this one.
+        const float glideSemitones = glideOffset;
+        const float glideMove = glideStep * static_cast<float> (numSamples);
+        glideOffset = std::abs (glideOffset) <= glideMove ? 0.0f : glideOffset - std::copysign (glideMove, glideOffset);
+
         for (int e = 0; e < EngineParams::numElements; ++e)
         {
             auto& el = elements[(size_t) e];
@@ -150,7 +157,7 @@ public:
             using Modulation::Kind;
             using Modulation::elementUnits;
             const auto& frame = frames[(size_t) e];
-            const float pitch = frame.pitchOffsetSemitones + elementUnits (units, e, Kind::pitch) * Modulation::pitchSemitonesPerUnit;
+            const float pitch = frame.pitchOffsetSemitones + glideSemitones + elementUnits (units, e, Kind::pitch) * Modulation::pitchSemitonesPerUnit;
             const float width = std::clamp (frame.width01 + elementUnits (units, e, Kind::width) * 0.01f, 0.0f, 1.0f);
             const float warp  = std::clamp (frame.warp01  + elementUnits (units, e, Kind::warp)  * 0.01f, 0.0f, 1.0f);
             const float clip  = std::clamp (frame.clip01  + elementUnits (units, e, Kind::clip)  * 0.01f, 0.0f, 1.0f);
@@ -203,6 +210,15 @@ private:
         playingVelocity = velocity;
         mods.noteOn (latestParams);
 
+        glideOffset = glideStep = 0.0f;
+
+        if (pendingGlideFrom >= 0 && pendingGlideFrom != note && latestParams.glide > 0.0f)
+        {
+            glideOffset = static_cast<float> (pendingGlideFrom - note);
+            const float octaves = latestParams.glideByRate ? std::abs (glideOffset) / 12.0f : 1.0f;
+            glideStep = std::abs (glideOffset) / (latestParams.glide * 0.02f * octaves * static_cast<float> (sampleRate));
+        }
+
         for (int e = 0; e < EngineParams::numElements; ++e)
         {
             elements[(size_t) e].filter.reset();
@@ -222,4 +238,6 @@ private:
     bool held = false, hasPending = false;
     EngineParams latestParams;
     Modulation::VoiceState mods;
+    int pendingGlideFrom = -1;
+    float glideOffset = 0.0f, glideStep = 0.0f;   // semitones still to slide, and the slide per sample
 };

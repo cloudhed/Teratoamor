@@ -84,4 +84,5 @@ private:
     bool sustainDown = false;
     std::array<bool, numVoices> releaseDeferred {};
     std::uint64_t noteCounter = 0;
+    int lastNote = -1;   // previous note-on, the starting pitch for Glide
 };

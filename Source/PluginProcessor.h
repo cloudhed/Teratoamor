@@ -40,6 +40,9 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // Output peak of the last block (0..1 per channel), written by the audio thread for a level meter.
+    std::atomic<float> outputPeakLeft { 0.0f }, outputPeakRight { 0.0f };
+
 private:
     EngineParams readParams() const noexcept;
 
@@ -82,6 +85,10 @@ private:
     std::atomic<float>* distortionToneParam = nullptr;
     std::atomic<float>* masterLevelParam = nullptr;
     std::atomic<float>* masterPanParam = nullptr;
+    std::atomic<float>* glideParam = nullptr;
+    std::atomic<float>* glideModeParam = nullptr;
+    std::atomic<float>* tempoSyncParam = nullptr;
+    std::atomic<float>* tempoBpmParam = nullptr;
 
     struct ModParamPointers
     {

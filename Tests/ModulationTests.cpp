@@ -206,6 +206,75 @@ int main()
         check (high > 2.5 * low && high < 6.0 * low, "Pulse on All Pitch alternates two octaves apart at Depth 33");
     }
 
+    // Engine: Glide makes a new note slide up from the previous note; Glide 0 does not.
+    {
+        auto glideRatio = [] (float glide)
+        {
+            auto p = basePatch();
+            p.elements[0].width = 85.0f;
+            p.glide = glide;
+            Engine e;
+            e.prepare (sr);
+            std::vector<float> l (512), r (512), heard;
+            auto run = [&] (double seconds, bool keep)
+            {
+                for (int done = 0; done < static_cast<int> (seconds * sr); done += 512)
+                {
+                    e.setParams (p);
+                    e.render (l.data(), r.data(), 512);
+                    if (keep) heard.insert (heard.end(), l.begin(), l.end());
+                }
+            };
+            e.setParams (p);
+            e.noteOn (48, 1.0f);
+            run (0.3, false);
+            e.noteOff (48);
+            run (1.5, false);          // let the first note die away completely
+            e.noteOn (72, 1.0f);       // two octaves up
+            run (2.6, true);
+            const double early = crossingsPerSecond (heard, 0.1, 0.3), late = crossingsPerSecond (heard, 2.2, 2.6);
+            return early / late;
+        };
+        const double slid = glideRatio (100.0f), plain = glideRatio (0.0f);
+        std::printf ("       early/late crossing rate: Glide 100 = %.2f, Glide 0 = %.2f\n", slid, plain);
+        check (slid < 0.7 && plain > 0.8 && plain < 1.25, "Glide slides a new note up from the previous note; Glide 0 does not");
+    }
+
+    // Engine: in Rate mode a bigger jump takes longer; in Time mode it does not.
+    {
+        auto crossingsAt = [] (bool byRate, double from, double to)
+        {
+            auto p = basePatch();
+            p.elements[0].width = 85.0f;
+            p.glide = 100.0f;
+            p.glideByRate = byRate;
+            Engine e;
+            e.prepare (sr);
+            std::vector<float> l (512), r (512), heard;
+            const auto run = [&] (double seconds, bool keep)
+            {
+                for (int done = 0; done < static_cast<int> (seconds * sr); done += 512)
+                {
+                    e.setParams (p);
+                    e.render (l.data(), r.data(), 512);
+                    if (keep) heard.insert (heard.end(), l.begin(), l.end());
+                }
+            };
+            e.setParams (p);
+            e.noteOn (48, 1.0f);
+            run (0.3, false);
+            e.noteOff (48);
+            run (1.5, false);
+            e.noteOn (72, 1.0f);   // 24 semitones: 2 s in Time mode, 4 s in Rate mode
+            run (5.0, true);
+            return crossingsPerSecond (heard, from, to);
+        };
+        const double timeMode = crossingsAt (false, 2.2, 2.6) / crossingsAt (false, 4.6, 5.0);
+        const double rateMode = crossingsAt (true, 2.2, 2.6) / crossingsAt (true, 4.6, 5.0);
+        std::printf ("       pitch at 2.4 s relative to final: Time mode %.2f, Rate mode %.2f\n", timeMode, rateMode);
+        check (timeMode > 0.85 && rateMode < 0.8, "Glide Rate mode takes longer for a big jump; Time mode does not");
+    }
+
     // Engine: Master Pan, and Volume modulation cannot revive a silent Element.
     {
         auto p = basePatch();

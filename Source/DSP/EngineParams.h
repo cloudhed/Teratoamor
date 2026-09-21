@@ -184,6 +184,8 @@ struct EngineParams
 
     float master = 70.0f;      // 0..100
     float masterPan = 0.0f;    // -100..100
+    float glide = 0.0f;        // 0..100: slide from the previous note's pitch; 0 is off
+    bool glideByRate = false;  // false: Glide 100 = 2 s for any jump; true: 2 s per octave, so bigger jumps take longer
     std::array<ModParams, numMods> mods;
     std::array<ElementParams, numElements> elements;
     GlobalFilterParams globalFilter;
