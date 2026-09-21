@@ -28,7 +28,12 @@ Complete:
 
 - [x] First sound: 8-voice engine in `Source/DSP/` (seeded noise -> stability-guarded TPT band-pass -> cubic-attack/linear-release envelope, per Element), MIDI note on/off with sample-accurate timing, and `TeratoamorEngineTests` (`build\Debug\TeratoamorEngineTests.exe`)
 
-Still pending for Milestone 1: Cubase 10 / standalone MIDI verification by ear, sustain pedal, pitch bend, level calibration against the reference recordings, and the remaining verification items.
+- [x] Sustain pedal (CC 64) and pitch bend (+/-2 semitones)
+- [x] Cubase 10 verification (user-confirmed): VST3 loads and plays, level matches the reference, eight simultaneous voices do not overload
+
+- [x] Cubase 10 session save/restore and automation (user-confirmed)
+
+Still pending for Milestone 1: standalone MIDI check, a designed GUI, and the remaining measurement-based verification items.
 
 ## Phase 0: project skeleton
 
@@ -57,7 +62,7 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 - [x] Produce a Windows x64 VST3.
 - [x] Produce a Windows x64 standalone application.
-- [ ] Verify that the VST3 is discoverable and loads in Cubase 10.
+- [x] Verify that the VST3 is discoverable and loads in Cubase 10.
 - [ ] Verify that the standalone application starts and accepts MIDI input.
 
 ### Voice engine
@@ -94,7 +99,7 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [ ] Stress Width near 100 across the supported pitch range.
 - [ ] Confirm silence and finite output after resets, rapid parameter changes, and state restoration.
 - [ ] Compare pitch, Width response, envelope timing, and stereo behaviour with permitted clean-room measurements.
-- [ ] Confirm saved sessions restore the audible state.
+- [x] Confirm saved sessions restore the audible state.
 
 ## Later milestones
 

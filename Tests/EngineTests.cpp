@@ -191,6 +191,33 @@ int main()
         check (rms (c.l, 12000, 24000) > 0.01 && rms (c.r, 12000, 24000) < 1.0e-4, "hard-left pan");
     }
 
+    // 10. Sustain pedal keeps a released note sounding until the pedal is lifted.
+    {
+        Engine e; e.prepare (48000.0); e.setParams (defaultParams());
+        e.setSustainPedal (true);
+        e.noteOn (60, 1.0f);
+        Capture c; renderBlocks (e, c, 12000);
+        e.noteOff (60);
+        Capture d; renderBlocks (e, d, 48000);
+        check (rms (d.l, 40000, 48000) > 0.01, "note keeps sounding while pedal is down");
+        e.setSustainPedal (false);
+        Capture f; renderBlocks (e, f, 48000);
+        check (rms (f.l, 40000, 48000) == 0.0, "note releases when pedal is lifted");
+    }
+
+    // 11. Pitch bend: full up bends 2 semitones.
+    {
+        Engine e; e.prepare (48000.0);
+        e.setPitchBend (1.0f); e.setParams (defaultParams());
+        e.noteOn (60, 1.0f);
+        Capture c; renderBlocks (e, c, 96000);
+        std::vector<float> tail (c.l.begin() + 24000, c.l.end());
+        const double target = 261.6256 * std::pow (2.0, 2.0 / 12.0);
+        const double f = peakFrequency (tail, 48000.0, 285.0, 300.0, 0.1);
+        std::printf ("       measured pitch %.2f Hz (target %.2f)\n", f, target);
+        check (std::abs (f - target) < 1.5, "pitch bend up 2 semitones");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

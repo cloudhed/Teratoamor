@@ -94,6 +94,10 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             engine.noteOn (message.getNoteNumber(), message.getFloatVelocity());
         else if (message.isNoteOff())
             engine.noteOff (message.getNoteNumber());
+        else if (message.isPitchWheel())
+            engine.setPitchBend (static_cast<float> (message.getPitchWheelValue() - 8192) / 8192.0f);
+        else if (message.isController() && message.getControllerNumber() == 64)
+            engine.setSustainPedal (message.getControllerValue() >= 64);
         else if (message.isAllNotesOff() || message.isAllSoundOff())
             engine.allNotesOff();
     }

@@ -19,6 +19,7 @@ class Engine
 {
 public:
     static constexpr int numVoices = 8;
+    static constexpr float pitchBendRangeSemitones = 2.0f;
 
     void prepare (double sampleRate);
     void reset();
@@ -29,6 +30,12 @@ public:
     void noteOn (int midiNote, float velocity01);
     void noteOff (int midiNote);
     void allNotesOff();
+
+    // Sustain pedal (CC 64): while down, released keys keep sounding until the pedal is lifted.
+    void setSustainPedal (bool down);
+
+    // Pitch wheel position, -1..1, scaled by pitchBendRangeSemitones.
+    void setPitchBend (float position);
 
     // Overwrites left/right with numSamples of output.
     void render (float* left, float* right, int numSamples);
@@ -62,6 +69,8 @@ private:
     EngineParams params;
     std::array<Voice, numVoices> voices;
     std::array<ElementSmoothers, EngineParams::numElements> smoothers;
-    Smoothed master;
+    Smoothed master, pitchBend;
+    bool sustainDown = false;
+    std::array<bool, numVoices> releaseDeferred {};
     std::uint64_t noteCounter = 0;
 };

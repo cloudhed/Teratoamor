@@ -29,6 +29,9 @@ void Engine::reset()
     for (auto& v : voices)
         v.kill();
 
+    releaseDeferred.fill (false);
+    sustainDown = false;
+    pitchBend.snap (0.0f);
     snapOnNextParams = true;
 }
 
@@ -52,6 +55,7 @@ void Engine::setParams (const EngineParams& newParams)
     if (snapOnNextParams)
     {
         master.snap (master.target);
+        pitchBend.snap (pitchBend.target);
         for (auto& s : smoothers)
         {
             s.pitch.snap (s.pitch.target);
@@ -91,26 +95,62 @@ Voice* Engine::chooseVoice (int midiNote) noexcept
 void Engine::noteOn (int midiNote, float velocity01)
 {
     if (auto* v = chooseVoice (midiNote))
+    {
+        releaseDeferred[(size_t) (v - voices.data())] = false;
         v->noteOn (midiNote, std::clamp (velocity01, 0.0f, 1.0f), ++noteCounter, params);
+    }
 }
 
 void Engine::noteOff (int midiNote)
 {
-    for (auto& v : voices)
-        if (v.isHeld() && v.getNote() == midiNote)
+    for (size_t i = 0; i < voices.size(); ++i)
+    {
+        auto& v = voices[i];
+
+        if (! (v.isHeld() && v.getNote() == midiNote))
+            continue;
+
+        if (sustainDown)
+            releaseDeferred[i] = true;   // keep sounding until the pedal is lifted
+        else
             v.noteOff (params);
+    }
 }
 
 void Engine::allNotesOff()
 {
+    releaseDeferred.fill (false);
+
     for (auto& v : voices)
         if (v.isHeld())
             v.noteOff (params);
 }
 
+void Engine::setSustainPedal (bool down)
+{
+    sustainDown = down;
+
+    if (down)
+        return;
+
+    for (size_t i = 0; i < voices.size(); ++i)
+    {
+        if (releaseDeferred[i] && voices[i].isHeld())
+            voices[i].noteOff (params);
+
+        releaseDeferred[i] = false;
+    }
+}
+
+void Engine::setPitchBend (float position)
+{
+    pitchBend.target = std::clamp (position, -1.0f, 1.0f) * pitchBendRangeSemitones;
+}
+
 ElementFrames Engine::nextFrames() noexcept
 {
     ElementFrames frames;
+    pitchBend.advance (chunkCoefficient);
 
     for (int e = 0; e < EngineParams::numElements; ++e)
     {
@@ -125,7 +165,7 @@ ElementFrames Engine::nextFrames() noexcept
         const float sqrt2 = 1.41421356f;
 
         auto& f = frames[(size_t) e];
-        f.pitchOffsetSemitones = s.pitch.current;
+        f.pitchOffsetSemitones = s.pitch.current + pitchBend.current;
         f.width01 = s.width.current;
         f.gainL = s.gain.current * std::cos (angle) * sqrt2;
         f.gainR = s.gain.current * std::sin (angle) * sqrt2;
