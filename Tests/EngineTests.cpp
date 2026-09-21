@@ -838,6 +838,99 @@ int main()
         check (ok, "global filter finite and bounded across types, extremes, sample rates, rapid switching");
     }
 
+    // 24. Distortion: exact bypass, moderate harmonics, tone, stereo isolation and automation.
+    {
+        auto sine = [] (float crush, float tone, double sr, double frequency, DistortionType type = DistortionType::drive)
+        {
+            Distortion d; d.prepare (sr); d.setParameters (crush, tone, type);
+            Capture c; c.l.resize ((size_t) sr); c.r.resize ((size_t) sr);
+            for (size_t i = 0; i < c.l.size(); ++i)
+                c.l[i] = 0.15f * static_cast<float> (std::sin (6.28318530718 * frequency * (double) i / sr));
+            d.process (c.l.data(), c.r.data(), (int) c.l.size());
+            return c;
+        };
+        auto harmonic = [] (const Capture& c, double frequency)
+        {
+            std::complex<double> sum {};
+            for (size_t i = 24000; i < 48000; ++i)
+                sum += (double) c.l[i] * std::polar (1.0, -6.28318530718 * frequency * (double) i / 48000.0);
+            return std::abs (sum);
+        };
+        const auto dry = sine (0, 0, 48000, 200);
+        const auto dryBright = sine (0, 100, 48000, 200);
+        const auto mild = sine (50, 50, 48000, 200);
+        const auto full = sine (100, 50, 48000, 200);
+        bool bypass = dry.l == dryBright.l;
+        for (size_t i = 0; i < dry.l.size(); ++i)
+            bypass = bypass && dry.l[i] == 0.15f * static_cast<float> (std::sin (6.28318530718 * 200.0 * (double) i / 48000.0));
+        check (bypass, "Drive zero is exact bypass at any Tone");
+        const double third = harmonic (full, 600) / harmonic (full, 200);
+        check (third > 0.02 && third < 0.15
+            && harmonic (mild, 600) / harmonic (mild, 200) < third,
+            "Drive adds progressively stronger, restrained odd harmonics");
+        check (std::abs (20.0 * std::log10 (rms (full.l, 24000, 48000) / rms (dry.l, 24000, 48000))) < 3.0,
+            "maximum Drive stays within 3 dB of dry for a nominal-level sine");
+        Capture previous = dry;
+        for (auto& x : previous.l) x = std::tanh (8.0f * x) * (1.35f / 8.0f);
+        const double previousThird = harmonic (previous, 600) / harmonic (previous, 200);
+        check (third > previousThird * 1.15 && third < previousThird * 1.7,
+            "Drive maximum has moderately more harmonics than the previous version");
+        const auto neutral = sine (100, 50, 48000, 6000);
+        const auto dark = sine (100, 0, 48000, 6000);
+        const auto bright = sine (100, 100, 48000, 6000);
+        check (rms (bright.l, 24000, 48000) > 2.0 * rms (dark.l, 24000, 48000), "Tone darkens and brightens the saturated signal");
+        check (rms (dark.l, 24000, 48000) < 0.35 * rms (neutral.l, 24000, 48000)
+            && rms (bright.l, 24000, 48000) > 3.5 * rms (neutral.l, 24000, 48000),
+            "both Tone extremes exceed the previous 6 dB range");
+        const auto bypassType = sine (100, 100, 48000, 200, DistortionType::bypass);
+        check (bypassType.l == dry.l, "Type Bypass ignores both knobs");
+        // A constant input isolates mode-switch discontinuities from the source waveform.
+        Distortion switching; switching.prepare (48000);
+        switching.setParameters (100, 50, DistortionType::drive);
+        float last = 0.0f, maxJump = 0.0f;
+        for (int i = 0; i < 48000; ++i)
+        {
+            if (i == 8000) switching.setParameters (100, 50, DistortionType::bypass);
+            if (i == 16000) switching.setParameters (100, 50, DistortionType::drive);
+            if (i == 24000) switching.setParameters (100, 50, DistortionType::bypass);
+            float l = 0.15f, r = 0.0f;
+            switching.process (&l, &r, 1);
+            if (i > 0) maxJump = std::max (maxJump, std::abs (l - last));
+            last = l;
+        }
+        check (maxJump < 0.001f && last == 0.15f, "type changes crossfade smoothly and settle to exact bypass");
+        // Exercise the new modes through the complete engine too.
+        Engine drivenEngine, cleanEngine; drivenEngine.prepare (48000); cleanEngine.prepare (48000);
+        auto params = defaultParams(); params.distortion = { 100, 50, DistortionType::drive };
+        drivenEngine.setParams (params); cleanEngine.setParams (defaultParams());
+        drivenEngine.noteOn (60, 1); cleanEngine.noteOn (60, 1);
+        Capture drivenAudio, cleanAudio;
+        renderBlocks (drivenEngine, drivenAudio, 48000); renderBlocks (cleanEngine, cleanAudio, 48000);
+        check (allFinite (drivenAudio) && drivenAudio.l != cleanAudio.l, "engine routes the selected distortion type");
+        check (rms (full.r, 0, full.r.size()) == 0.0, "distortion has no stereo crosstalk");
+        bool ok = true;
+        for (double sr : { 22050.0, 44100.0, 48000.0, 96000.0, 192000.0 })
+        {
+            Distortion d; d.prepare (sr);
+            float l[64], r[64];
+            allocationCount = 0; countAllocations = true;
+            for (int block = 0; block < 500; ++block)
+            {
+                d.setParameters (block % 2 ? 100.0f : 0.0f, (float) (block % 101), static_cast<DistortionType> ((block / 3) % 2));
+                std::fill_n (l, 64, 8.0f); std::fill_n (r, 64, -8.0f);
+                d.process (l, r, 64);
+                for (int i = 0; i < 64; ++i)
+                    ok = ok && std::isfinite (l[i]) && std::isfinite (r[i]) && std::abs (l[i]) <= 8.0f;
+            }
+            countAllocations = false;
+            ok = ok && allocationCount == 0;
+            d.reset(); d.setParameters (100, 100, DistortionType::drive);
+            std::fill_n (l, 64, 0.0f); std::fill_n (r, 64, 0.0f); d.process (l, r, 64);
+            for (int i = 0; i < 64; ++i) ok = ok && l[i] == 0.0f && r[i] == 0.0f;
+        }
+        check (ok, "distortion stable under hot input and rapid automation at all rates, allocation-free, reset silent");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

@@ -2,6 +2,8 @@
 
 #include "EngineParams.h"
 #include "GlobalFilter.h"
+#include "Distortion.h"
+#include "ParallelDelay.h"
 #include "Voice.h"
 
 #include <array>
@@ -73,6 +75,8 @@ private:
     Smoothed master, pitchBend;
     Smoothed filterCutoff, filterQ;   // global filter knobs, 0..1
     GlobalFilter globalFilter;
+    Distortion distortion;
+    ParallelDelay delay;
     bool sustainDown = false;
     std::array<bool, numVoices> releaseDeferred {};
     std::uint64_t noteCounter = 0;

@@ -21,6 +21,8 @@ void Engine::prepare (double newSampleRate)
         voices[(size_t) v].prepare (sampleRate, v);
 
     globalFilter.reset();
+    distortion.prepare (sampleRate);
+    delay.prepare (sampleRate);
     noteCounter = 0;
     snapOnNextParams = true;
 }
@@ -33,6 +35,8 @@ void Engine::reset()
     releaseDeferred.fill (false);
     sustainDown = false;
     pitchBend.snap (0.0f);
+    distortion.reset();
+    delay.reset();
     globalFilter.reset();
     snapOnNextParams = true;
 }
@@ -40,6 +44,8 @@ void Engine::reset()
 void Engine::setParams (const EngineParams& newParams)
 {
     params = newParams;
+    delay.setParameters (params.delay);
+    distortion.setParameters (params.distortion.crush, params.distortion.tone, params.distortion.type);
 
     // Linked Elements (2 and 3) take the envelope settings of Element 1.
     for (int e = 1; e < EngineParams::numElements; ++e)
@@ -224,6 +230,9 @@ void Engine::render (float* left, float* right, int numSamples)
         filterQ.advance (chunkCoefficient);
         globalFilter.setParameters (params.globalFilter.type, filterCutoff.current, filterQ.current, sampleRate);
         globalFilter.process (left + start, right + start, n);
+
+        distortion.process (left + start, right + start, n);
+        delay.process (left + start, right + start, n);
 
         // Master level, then a hard safety clamp that also removes any NaN/infinity.
         for (int i = start; i < start + n; ++i)

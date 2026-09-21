@@ -48,6 +48,16 @@ private:
         bool linked = false;
     };
 
+    struct DelayPanel
+    {
+        juce::ToggleButton on;
+        juce::Label rateLabel;
+        juce::ComboBox rate;
+        std::unique_ptr<SliderRow> decay, pan;
+        std::unique_ptr<ButtonAttachment> onAttachment;
+        std::unique_ptr<ComboBoxAttachment> rateAttachment;
+    };
+
     void timerCallback() override;
     void refreshLinkState();
 
@@ -57,6 +67,14 @@ private:
     std::unique_ptr<SliderRow> master;
 
     // Global filter strip: type, Q, and Cutoff on one line above the Elements.
+    juce::GroupComponent delayGroup;
+    std::unique_ptr<SliderRow> delayMix, delayCut;
+    std::array<DelayPanel, 2> delays;
+    juce::GroupComponent distortionGroup;
+    juce::Label distortionTypeLabel;
+    juce::ComboBox distortionType;
+    std::unique_ptr<ComboBoxAttachment> distortionTypeAttachment;
+    std::unique_ptr<SliderRow> distortionCrush, distortionTone;
     juce::GroupComponent filterGroup;
     juce::Label filterTypeLabel;
     juce::ComboBox filterType;

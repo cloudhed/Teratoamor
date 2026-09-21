@@ -53,6 +53,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
         NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::distortionCrush, 7), "Distortion Drive",
+        NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::distortionTone, 7), "Distortion Tone",
+        NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
     for (int e = 0; e < ParamIDs::numElements; ++e)
     {
         const auto prefix = "Element " + juce::String (e + 1) + " ";
@@ -128,6 +137,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
         layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::time (e), versionHint4), prefix + "Time",
             NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f));
+    }
+
+    layout.add (std::make_unique<AudioParameterChoice> (
+        makeID (ParamIDs::distortionType, 8), "Distortion Type",
+        juce::StringArray { "Bypass", "Drive" }, 0));
+
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::delayMix, 9), "Delay Mix", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 25.0f));
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::delayCut, 9), "Delay Cut", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f));
+    juce::StringArray rates;
+    for (const auto& rate : DelayRates::values) rates.add (rate.name);
+    for (int d = 0; d < 2; ++d)
+    {
+        const auto prefix = "Delay " + juce::String (d + 1) + " ";
+        layout.add (std::make_unique<AudioParameterBool> (makeID (ParamIDs::delayOn (d), 9), prefix + "On", false));
+        layout.add (std::make_unique<AudioParameterChoice> (
+            makeID (ParamIDs::delayRate (d), 9), prefix + "Rate", rates, DelayRates::defaultRate));
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::delayDecay (d), 9), prefix + "Decay", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 35.0f));
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::delayPan (d), 9), prefix + "Pan", NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
     }
 
     return layout;

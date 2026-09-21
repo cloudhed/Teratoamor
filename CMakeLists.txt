@@ -32,6 +32,9 @@ target_sources(Teratoamor PRIVATE
     Source/Parameters/Parameters.cpp
     Source/Parameters/Parameters.h
     Source/DSP/Engine.cpp
+    Source/DSP/DelayRates.h
+    Source/DSP/ParallelDelay.h
+    Source/DSP/Distortion.h
     Source/DSP/Engine.h
     Source/DSP/EngineParams.h
     Source/DSP/ElementEnvelope.h
@@ -67,3 +70,7 @@ add_test(NAME EngineTests COMMAND TeratoamorEngineTests)
 # It uses the same JUCE-free DSP engine as the tests and writes only to a caller-selected folder.
 add_executable(TeratoamorWidthRenderer Tests/WidthRenderer.cpp Source/DSP/Engine.cpp)
 target_include_directories(TeratoamorWidthRenderer PRIVATE Source)
+
+add_executable(TeratoamorDelayTests Tests/DelayTests.cpp Source/DSP/Engine.cpp)
+target_include_directories(TeratoamorDelayTests PRIVATE Source)
+add_test(NAME DelayTests COMMAND TeratoamorDelayTests)

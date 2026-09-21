@@ -9,6 +9,7 @@ namespace
     constexpr int titleHeight = 44;
     constexpr int groupTopPadding = 22;
     constexpr int filterStripHeight = groupTopPadding + rowHeight + 6;   // global filter group
+    constexpr int delayHeight = groupTopPadding + 3 * rowHeight + 6;
     constexpr int linesPerPanel = 16;   // on, filter, 8 tone sliders, link line, 5 envelope sliders
 }
 
@@ -37,6 +38,59 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
     master = std::make_unique<SliderRow> (state, ParamIDs::masterLevel, "Master");
     addAndMakeVisible (master->label);
     addAndMakeVisible (master->slider);
+
+    distortionGroup.setText ("Distortion");
+    addAndMakeVisible (distortionGroup);
+    distortionTypeLabel.setText ("Type", juce::dontSendNotification);
+    addAndMakeVisible (distortionTypeLabel);
+    addAndMakeVisible (distortionType);
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (ParamIDs::distortionType)))
+        distortionType.addItemList (choice->choices, 1);
+    distortionTypeAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::distortionType, distortionType);
+    distortionCrush = std::make_unique<SliderRow> (state, ParamIDs::distortionCrush, "Drive");
+    distortionTone = std::make_unique<SliderRow> (state, ParamIDs::distortionTone, "Tone");
+    for (auto* row : { distortionCrush.get(), distortionTone.get() })
+    {
+        addAndMakeVisible (row->label);
+        addAndMakeVisible (row->slider);
+    }
+    distortionCrush->slider.setTooltip ("Saturation amount in Drive mode. Zero is dry.");
+    distortionTone->slider.setTooltip ("Dark to bright; 50 is neutral. Shapes Drive when its amount is above zero.");
+
+    delayGroup.setText ("Delay");
+    addAndMakeVisible (delayGroup);
+    delayMix = std::make_unique<SliderRow> (state, ParamIDs::delayMix, "Mix");
+    delayCut = std::make_unique<SliderRow> (state, ParamIDs::delayCut, "Cut");
+    for (auto* row : { delayMix.get(), delayCut.get() })
+    {
+        addAndMakeVisible (row->label);
+        addAndMakeVisible (row->slider);
+    }
+    delayMix->slider.setTooltip ("0: dry, 100: echoes only. Both delays off bypasses this block.");
+    delayCut->slider.setTooltip ("Echoes only: 0 high-cut (darker), 50 no cut, 100 low-cut (thinner).");
+    for (int d = 0; d < 2; ++d)
+    {
+        auto& panel = delays[static_cast<size_t> (d)];
+        panel.on.setButtonText ("Delay " + juce::String (d + 1));
+        addAndMakeVisible (panel.on);
+        panel.onAttachment = std::make_unique<ButtonAttachment> (state, ParamIDs::delayOn (d), panel.on);
+        panel.rateLabel.setText ("Rate", juce::dontSendNotification);
+        addAndMakeVisible (panel.rateLabel);
+        addAndMakeVisible (panel.rate);
+        if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (ParamIDs::delayRate (d))))
+            panel.rate.addItemList (choice->choices, 1);
+        panel.rateAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::delayRate (d), panel.rate);
+        panel.rate.setTooltip ("Host-synced note length. T: triplet, D: dotted. Without host tempo: 120 BPM.");
+        panel.decay = std::make_unique<SliderRow> (state, ParamIDs::delayDecay (d), "Decay");
+        panel.pan = std::make_unique<SliderRow> (state, ParamIDs::delayPan (d), "Pan");
+        panel.decay->slider.setTooltip ("0: one echo; 100: long, fading repeats.");
+        panel.pan->slider.setTooltip ("-100: left, 0: centred mono echo, +100: right.");
+        for (auto* row : { panel.decay.get(), panel.pan.get() })
+        {
+            addAndMakeVisible (row->label);
+            addAndMakeVisible (row->slider);
+        }
+    }
 
     filterGroup.setText ("Global filter");
     addAndMakeVisible (filterGroup);
@@ -123,7 +177,7 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
     }
 
     setSize (4 * margin + 3 * panelWidth,
-             titleHeight + filterStripHeight + margin + groupTopPadding + linesPerPanel * rowHeight + 3 * margin);
+             titleHeight + 2 * (filterStripHeight + margin) + delayHeight + margin + groupTopPadding + linesPerPanel * rowHeight + 3 * margin);
 
     refreshLinkState();
     startTimerHz (10);   // picks up Link changes made by the host (automation, session load)
@@ -198,6 +252,36 @@ void TeratoamorAudioProcessorEditor::resized()
         row->label.setBounds (line.removeFromLeft (labelWidth));
         row->slider.setBounds (line);
     };
+
+    auto distortionStrip = area.removeFromTop (filterStripHeight);
+    distortionGroup.setBounds (distortionStrip);
+    auto distortionInner = distortionStrip.reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto distortionTypeArea = distortionInner.removeFromLeft (200);
+    distortionTypeLabel.setBounds (distortionTypeArea.removeFromLeft (50));
+    distortionType.setBounds (distortionTypeArea.reduced (0, 2));
+    distortionInner.removeFromLeft (margin);
+    auto crushArea = distortionInner.removeFromLeft (distortionInner.getWidth() / 2);
+    placeRow (crushArea.withTrimmedRight (margin), distortionCrush.get());
+    placeRow (distortionInner, distortionTone.get());
+    area.removeFromTop (margin);
+
+    auto delayArea = area.removeFromTop (delayHeight);
+    delayGroup.setBounds (delayArea);
+    auto delayInner = delayArea.reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto sharedLine = delayInner.removeFromTop (rowHeight);
+    placeRow (sharedLine.removeFromLeft (sharedLine.getWidth() / 2).withTrimmedRight (margin), delayMix.get());
+    placeRow (sharedLine, delayCut.get());
+    for (auto& panel : delays)
+    {
+        auto line = delayInner.removeFromTop (rowHeight);
+        panel.on.setBounds (line.removeFromLeft (95));
+        panel.rateLabel.setBounds (line.removeFromLeft (40));
+        panel.rate.setBounds (line.removeFromLeft (130).reduced (0, 2));
+        line.removeFromLeft (margin);
+        placeRow (line.removeFromLeft (line.getWidth() / 2).withTrimmedRight (margin), panel.decay.get());
+        placeRow (line, panel.pan.get());
+    }
+    area.removeFromTop (margin);
 
     for (size_t e = 0; e < panels.size(); ++e)
     {

@@ -15,6 +15,17 @@ namespace ParamIDs
     inline const juce::String filterCutoff { "gf_cutoff" };
     inline const juce::String filterQ      { "gf_q" };
 
+    inline const juce::String distortionType { "dist_type" };
+    inline const juce::String distortionCrush { "dist_crush" };
+    inline const juce::String distortionTone  { "dist_tone" };
+
+    inline const juce::String delayMix { "delay_mix" };
+    inline const juce::String delayCut { "delay_cut" };
+    inline juce::String delayOn (int d) { return "delay" + juce::String (d + 1) + "_on"; }
+    inline juce::String delayRate (int d) { return "delay" + juce::String (d + 1) + "_rate"; }
+    inline juce::String delayDecay (int d) { return "delay" + juce::String (d + 1) + "_decay"; }
+    inline juce::String delayPan (int d) { return "delay" + juce::String (d + 1) + "_pan"; }
+
     // Per-Element IDs are "el<N>_<name>", where N is 1..3.
     inline juce::String element (int elementIndex, const char* name)
     {

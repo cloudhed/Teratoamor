@@ -27,7 +27,7 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
+    double getTailLengthSeconds() const override;
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -64,6 +64,22 @@ private:
         std::atomic<float>* pan = nullptr;
     };
 
+    struct DelayParamPointers
+    {
+        std::atomic<float>* on = nullptr;
+        std::atomic<float>* rate = nullptr;
+        std::atomic<float>* decay = nullptr;
+        std::atomic<float>* pan = nullptr;
+    };
+    std::array<DelayParamPointers, 2> delayParams;
+    std::atomic<float>* delayMixParam = nullptr;
+    std::atomic<float>* delayCutParam = nullptr;
+    std::atomic<double> hostBpm { 120.0 };
+    std::atomic<bool> resetEngineOnNextBlock { false };
+
+    std::atomic<float>* distortionTypeParam = nullptr;
+    std::atomic<float>* distortionCrushParam = nullptr;
+    std::atomic<float>* distortionToneParam = nullptr;
     std::atomic<float>* masterLevelParam = nullptr;
     std::atomic<float>* filterTypeParam = nullptr;
     std::atomic<float>* filterCutoffParam = nullptr;

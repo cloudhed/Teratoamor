@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DelayRates.h"
 #include <algorithm>
 #include <array>
 
@@ -63,6 +64,32 @@ struct GlobalFilterParams
     float q      = 0.0f;     // 0..100
 };
 
+// Host choice order: never reorder.
+enum class DistortionType { bypass = 0, drive };
+
+struct DistortionParams
+{
+    float crush = 0.0f;    // 0..100; zero bypasses the whole stage
+    float tone = 50.0f;    // 0..100; 50 is neutral
+    DistortionType type = DistortionType::bypass;
+};
+
+struct DelayLineParams
+{
+    bool enabled = false;
+    int rate = DelayRates::defaultRate;
+    float decay = 35.0f;   // 0..100 maps to 0..0.95 feedback
+    float pan = 0.0f;      // -100 left, 0 mono centre, +100 right
+};
+
+struct DelayParams
+{
+    float mix = 25.0f;     // 0 dry, 100 wet; both lines off bypasses the block
+    float cut = 50.0f;     // 0 high-cut, 50 unchanged, 100 low-cut; wet only
+    double bpm = 120.0;    // host tempo, or standalone fallback
+    std::array<DelayLineParams, 2> lines;
+};
+
 struct EngineParams
 {
     static constexpr int numElements = 3;
@@ -70,4 +97,6 @@ struct EngineParams
     float master = 70.0f;      // 0..100
     std::array<ElementParams, numElements> elements;
     GlobalFilterParams globalFilter;
+    DistortionParams distortion;
+    DelayParams delay;
 };

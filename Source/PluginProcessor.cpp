@@ -5,6 +5,19 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, Parameters::stateType, Parameters::createLayout())
 {
+    delayMixParam = apvts.getRawParameterValue (ParamIDs::delayMix);
+    delayCutParam = apvts.getRawParameterValue (ParamIDs::delayCut);
+    for (int d = 0; d < 2; ++d)
+    {
+        auto& p = delayParams[static_cast<size_t> (d)];
+        p.on = apvts.getRawParameterValue (ParamIDs::delayOn (d));
+        p.rate = apvts.getRawParameterValue (ParamIDs::delayRate (d));
+        p.decay = apvts.getRawParameterValue (ParamIDs::delayDecay (d));
+        p.pan = apvts.getRawParameterValue (ParamIDs::delayPan (d));
+    }
+    distortionTypeParam = apvts.getRawParameterValue (ParamIDs::distortionType);
+    distortionCrushParam = apvts.getRawParameterValue (ParamIDs::distortionCrush);
+    distortionToneParam = apvts.getRawParameterValue (ParamIDs::distortionTone);
     masterLevelParam = apvts.getRawParameterValue (ParamIDs::masterLevel);
     filterTypeParam = apvts.getRawParameterValue (ParamIDs::filterType);
     filterCutoffParam = apvts.getRawParameterValue (ParamIDs::filterCutoff);
@@ -45,6 +58,16 @@ void TeratoamorAudioProcessor::releaseResources()
 EngineParams TeratoamorAudioProcessor::readParams() const noexcept
 {
     EngineParams out;
+    out.delay.mix = delayMixParam->load();
+    out.delay.cut = delayCutParam->load();
+    out.delay.bpm = hostBpm.load();
+    for (size_t d = 0; d < delayParams.size(); ++d)
+    {
+        const auto& p = delayParams[d];
+        out.delay.lines[d] = { p.on->load() >= 0.5f, juce::roundToInt (p.rate->load()), p.decay->load(), p.pan->load() };
+    }
+    out.distortion = { distortionCrushParam->load(), distortionToneParam->load(),
+        static_cast<DistortionType> (juce::jlimit (0, 1, juce::roundToInt (distortionTypeParam->load()))) };
     out.master = masterLevelParam->load();
     out.globalFilter.type = static_cast<GlobalFilterType> (juce::jlimit (0, 5, juce::roundToInt (filterTypeParam->load())));
     out.globalFilter.cutoff = filterCutoffParam->load();
@@ -90,6 +113,12 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     auto* left  = buffer.getWritePointer (0);
     auto* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : left;
 
+    double bpm = 120.0;
+    if (auto* hostPlayHead = getPlayHead())
+        if (const auto position = hostPlayHead->getPosition())
+            if (const auto tempo = position->getBpm()) bpm = *tempo;
+    hostBpm.store (DelayRates::validBpm (bpm));
+    if (resetEngineOnNextBlock.exchange (false)) engine.reset();
     engine.setParams (readParams());
 
     // Render in slices so each MIDI event takes effect at its exact sample position.
@@ -128,6 +157,22 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     midiMessages.clear();
 }
 
+double TeratoamorAudioProcessor::getTailLengthSeconds() const
+{
+    // Allow the longest Element release, plus repeats down to -80 dB.
+    const auto p = readParams();
+    double delayTail = 0.0;
+    if (p.delay.mix > 0.0f)
+        for (const auto& line : p.delay.lines)
+            if (line.enabled)
+            {
+                const double feedback = std::clamp (static_cast<double> (line.decay) * 0.0095, 0.0, 0.95);
+                const double repeats = feedback > 0.0 ? 1.0 + std::ceil (std::log (0.0001) / std::log (feedback)) : 1.0;
+                delayTail = std::max (delayTail, DelayRates::seconds (line.rate, p.delay.bpm) * repeats);
+            }
+    return 20.0 + delayTail;
+}
+
 juce::AudioProcessorEditor* TeratoamorAudioProcessor::createEditor()
 {
     return new TeratoamorAudioProcessorEditor (*this);
@@ -150,7 +195,42 @@ void TeratoamorAudioProcessor::setStateInformation (const void* data, int sizeIn
 
         // Ignore data that did not come from this plugin; missing parameters keep their defaults.
         if (state.isValid() && state.getType() == Parameters::stateType)
+        {
+            // Earlier distortion patches had no Type choice. Preserve their active
+            // Drive stage (including a zero value that may later be automated).
+            if (! state.getChildWithProperty ("id", ParamIDs::distortionType).isValid())
+            {
+                const bool hadDistortion = state.getChildWithProperty ("id", ParamIDs::distortionCrush).isValid();
+                juce::ValueTree typeState { "PARAM" };
+                typeState.setProperty ("id", ParamIDs::distortionType, nullptr);
+                typeState.setProperty ("value", hadDistortion ? 1.0f : 0.0f, nullptr);
+                state.addChild (typeState, -1, nullptr);
+            }
+            // Retired type index 2 now falls back to Drive.
+            auto typeState = state.getChildWithProperty ("id", ParamIDs::distortionType);
+            if (static_cast<float> (typeState.getProperty ("value")) > 1.0f)
+                typeState.setProperty ("value", 1.0f, nullptr);
+            // Old projects must not inherit delay values from a previously loaded patch.
+            auto addMissing = [&state] (const juce::String& id, float value)
+            {
+                if (state.getChildWithProperty ("id", id).isValid()) return;
+                juce::ValueTree parameter { "PARAM" };
+                parameter.setProperty ("id", id, nullptr);
+                parameter.setProperty ("value", value, nullptr);
+                state.addChild (parameter, -1, nullptr);
+            };
+            addMissing (ParamIDs::delayMix, 25.0f);
+            addMissing (ParamIDs::delayCut, 50.0f);
+            for (int d = 0; d < 2; ++d)
+            {
+                addMissing (ParamIDs::delayOn (d), 0.0f);
+                addMissing (ParamIDs::delayRate (d), static_cast<float> (DelayRates::defaultRate));
+                addMissing (ParamIDs::delayDecay (d), 35.0f);
+                addMissing (ParamIDs::delayPan (d), 0.0f);
+            }
             apvts.replaceState (state);
+            resetEngineOnNextBlock.store (true);
+        }
     }
 }
 

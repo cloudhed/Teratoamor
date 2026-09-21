@@ -187,3 +187,29 @@ When refining behaviour:
 3. Record conclusions here as measurements or hypotheses; label uncertainty clearly.
 4. Implement from general DSP knowledge without examining prohibited executable code.
 5. Use original Teratoamor names and visual presentation for all shipped features and presets.
+
+## Distortion listening observation
+
+User listening feedback (2026-09-21): one distortion type, with Crush and Tone controls. Maximum Crush feels closer to halfway on a distortion pedal: coloration rather than severe destruction. No distortion transfer function or Tone response has been measured.
+
+Teratoamor's first independent approximation uses gentle symmetric soft saturation after the global filter and before Master. The control is named Drive in Teratoamor (the host ID remains `dist_crush` for compatibility). Drive 0 bypasses the entire stage; Tone 50 is neutral, with a broad dark-to-bright treble shelf. These mappings, routing, defaults, and bypass behaviour are implementation choices awaiting listening feedback, not measured reference facts.
+
+Follow-up Teratoamor listening request: slightly stronger Drive, stronger Tone extremes, and Type choices Bypass, Drive, Bitcrush. These are deliberate product changes, not new Chimera observations. Drive maximum is now 10x rather than 8x; Tone uses a 700 Hz split and +/-12 dB treble gain at full Drive. Bitcrush is independent amplitude quantisation (16 to 4 bits), with Drive controlling depth and Tone shaping its output. Type changes crossfade; new instances start bypassed, and older distortion states select Drive.
+
+Subsequent listening decision: remove Bitcrush; it does not suit this synth. Teratoamor now offers only Bypass and Drive, retaining the stronger Drive and Tone ranges. Saved patches using the retired Bitcrush index load as Drive.
+
+## Delay observations and initial implementation
+
+User description and supplied screenshot (2026-09-21): a shared Mix and cut slider; cut 50 is unchanged, 0 is high-cut, 100 is low-cut, affecting only the delays. Two identical, independently enabled delays run in parallel, each with Rate (1/64T through 4/1), Decay 0..100, and Pan. User clarified Pan as -100 full left, 0 centre/mono, +100 full right. The permitted VSTXML export independently confirms shared Delay Filter/Mix and per-line Decay, On/Off, Pan, and Time parameters. No filter curves, feedback gains, or full intermediate Rate list have been measured.
+
+Teratoamor implementation choices, awaiting listening feedback:
+
+- After distortion and before Master: stereo dry path plus two independent mono delay sends (average of left and right), panned on return. Centre echoes are identical in both channels; dry stereo is preserved.
+- Shared Mix is a linear dry/wet crossfade. Both lines off bypasses the entire block. Two active returns are averaged to avoid doubling identical echoes.
+- Rate uses 26 ascending straight, triplet (T), and dotted (D) note lengths across the requested endpoints. Time is quarter-note beats times 60/BPM, independent of time signature. Host tempo is read each block; absent/invalid tempo falls back to 120 BPM. Supported tempo is 20..400 BPM, with 48 seconds of preallocated history per line supporting 4/1 at 20 BPM. Standalone currently uses the fallback tempo.
+- Decay maps linearly to feedback 0..0.95: zero gives one echo, 100 gives long but fading repeats. It is not infinite hold.
+- Cut is outside the feedback loops and affects only the summed wet return. Below 50, a two-pole low-pass sweeps 20 kHz to 500 Hz, blended progressively into the return; above 50, a two-pole high-pass sweeps 20 Hz to 2 kHz with the same blend. Exactly 50 bypasses filtering. Endpoints are estimates for listening, not measurements.
+- Continuous controls and on/off are smoothed over approximately 10 ms. Rate/tempo changes use a 20 ms read-head crossfade. Turning a line off fades it out and invalidates its history, so re-enabling does not recall old echoes. Reset and state restoration clear delay history without allocating or clearing long buffers on the audio thread.
+- New and older patches start with both lines off, Mix 25, Cut 50, each Rate 1/4, Decay 35, Pan 0. Parameter IDs use `delay_mix`, `delay_cut`, and `delay1_`/`delay2_` with `on`, `rate`, `decay`, and `pan` suffixes (version hint 9).
+
+`TeratoamorDelayTests` verifies timing, fractional delay interpolation, parallel routing, both pan endpoints, independent on/off, Mix, wet-only filter response, rate-change smoothing, block-size independence, maximum delay length, finite output at five sample rates, resets, audio-thread allocation count, and engine routing. Cut strength and Decay feel remain for human listening.
