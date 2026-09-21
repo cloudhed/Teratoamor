@@ -26,6 +26,8 @@ namespace ParamIDs
     inline juce::String warp     (int e) { return element (e, "warp"); }
     inline juce::String clip     (int e) { return element (e, "clip"); }
     // Added in parameter version 4 (envelope stages).
+    // Added in parameter version 5 (Elements 2 and 3 only).
+    inline juce::String link     (int e) { return element (e, "link"); }
     inline juce::String time     (int e) { return element (e, "time"); }
     inline juce::String decay    (int e) { return element (e, "decay"); }
     inline juce::String sustain  (int e) { return element (e, "sustain"); }

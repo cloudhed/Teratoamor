@@ -35,6 +35,7 @@ struct ElementParams
     float warp     = 0.0f;     // 0..100
     float clip     = 0.0f;     // 0..100 (Element 2 has no Clip control)
     float width    = 90.0f;    // 0..100
+    bool  link     = true;     // Elements 2 and 3 only: use Element 1's Attack, Decay, Sustain, Release, and Time
     float time     = 50.0f;    // 0..100: Decay and Release length. 50 = normal, 0 = nearly instant, 100 = twice as long
     float decay    = 0.0f;     // 0..100 (about 0.104 seconds per unit)
     float sustain  = 100.0f;   // 0..100 (percent of full level)

@@ -9,6 +9,7 @@ namespace
     constexpr int versionHint2 = 2;   // Milestone 2: Element filter mode
     constexpr int versionHint3 = 3;   // Milestone 2: Warp and Clip
     constexpr int versionHint4 = 4;   // Milestone 2: Time, Decay, Sustain
+    constexpr int versionHint5 = 5;   // Milestone 2: Link
 
     juce::ParameterID makeID (const juce::String& id, int version = versionHint)
     {
@@ -61,6 +62,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
             NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
 
         layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::width (e)), prefix + "Width",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 90.0f,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::warp (e), versionHint3), prefix + "Warp",
             NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
             juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
@@ -72,13 +78,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
                 juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            makeID (ParamIDs::width (e)), prefix + "Width",
-            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 90.0f,
+            makeID (ParamIDs::level (e)), prefix + "Level",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 80.0f,
             juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            makeID (ParamIDs::time (e), versionHint4), prefix + "Time",
-            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f));
+            makeID (ParamIDs::pan (e)), prefix + "Pan",
+            NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+
+        // Envelope, in the usual order: Link (Elements 2 and 3 only), Attack, Decay, Sustain, Release, Time.
+        // Element 1 has no Link: it is the source the others follow. Link is on by default.
+        if (e != 0)
+            layout.add (std::make_unique<AudioParameterBool> (
+                makeID (ParamIDs::link (e), versionHint5), prefix + "Link", true));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::attack (e)), prefix + "Attack",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f));
 
         layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::decay (e), versionHint4), prefix + "Decay",
@@ -90,21 +106,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
             juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            makeID (ParamIDs::attack (e)), prefix + "Attack",
-            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f));
-
-        layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::release (e)), prefix + "Release",
             NormalisableRange<float> (0.0f, 100.0f, 0.1f), 5.0f));
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            makeID (ParamIDs::level (e)), prefix + "Level",
-            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 80.0f,
-            juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
-
-        layout.add (std::make_unique<AudioParameterFloat> (
-            makeID (ParamIDs::pan (e)), prefix + "Pan",
-            NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+            makeID (ParamIDs::time (e), versionHint4), prefix + "Time",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f));
     }
 
     return layout;

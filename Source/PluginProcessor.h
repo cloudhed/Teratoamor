@@ -54,6 +54,7 @@ private:
         std::atomic<float>* warp = nullptr;
         std::atomic<float>* clip = nullptr;   // null on Element 2
         std::atomic<float>* width = nullptr;
+        std::atomic<float>* link = nullptr;   // null on Element 1
         std::atomic<float>* time = nullptr;
         std::atomic<float>* decay = nullptr;
         std::atomic<float>* sustain = nullptr;

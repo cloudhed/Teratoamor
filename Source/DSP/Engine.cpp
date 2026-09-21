@@ -39,6 +39,22 @@ void Engine::setParams (const EngineParams& newParams)
 {
     params = newParams;
 
+    // Linked Elements (2 and 3) take the envelope settings of Element 1.
+    for (int e = 1; e < EngineParams::numElements; ++e)
+    {
+        auto& p = params.elements[(size_t) e];
+
+        if (p.link)
+        {
+            const auto& first = params.elements[0];
+            p.attack = first.attack;
+            p.decay = first.decay;
+            p.sustain = first.sustain;
+            p.release = first.release;
+            p.time = first.time;
+        }
+    }
+
     master.target = std::clamp (params.master, 0.0f, 100.0f) / 100.0f;
 
     for (int e = 0; e < EngineParams::numElements; ++e)

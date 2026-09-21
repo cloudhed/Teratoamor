@@ -88,7 +88,7 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [x] Smooth continuously adjustable audio parameters.
 - [x] Save and restore parameter state through the host.
 - [x] Add master level.
-- [ ] Build a simple, functional, original JUCE GUI for the Milestone 1 controls.
+- [x] Build a simple, functional, original JUCE GUI for the Milestone 1 controls (`Source/PluginEditor.*`: master plus one column per Element, envelope in the order Attack, Decay, Sustain, Release, Time, with Link greying out the linked envelope). A designed GUI is still Milestone 5.
 - [ ] Avoid Chimera branding, artwork, silhouette, layout trade dress, and preset names.
 
 ### Milestone 1 verification
@@ -111,7 +111,7 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [x] Add Decay and Sustain (`el<N>_decay`, `el<N>_sustain`, version hint 4; Attack -> Decay -> Sustain -> Release in `ElementEnvelope.h`), fitted to `09_decay_*`, `10_sustain_*`, and `11_combined_*`: Decay is 0.104 s per unit and the output amplitude is a linear ramp raised to 1.95, which also sets the Sustain level (Sustain 50 is about 11 dB down). Defaults match the reference (Decay 0, Sustain 100). Values are read at note-on. Hold was dropped: it did not play at all in the reference above 0, so Teratoamor has no Hold control.
 - [x] Add Time as a Decay and Release length control (`el<N>_time`, version hint 4, default 50): both lengths are multiplied by Time/50, with a floor of 0.1 at Time 0. Fitted to the `07_time_*` recordings: the default Release tail (about 0.05 s, 0.45 s, 0.8 s at Time 0, 50, 100), Release 25 (about 0, 2.3 s, 4.7 s), and Decay 50 with Sustain 0 (about 0.5 s at Time 0). Onset was assumed unaffected (the slower onset in the Time 100 file is probably MIDI keypress timing).
 - [ ] Deferred (by choice): check whether Time affects Attack, and measure the exact Release curve shape.
-- [ ] Add Element 2 and 3 Link behaviour after it is cleanly specified.
+- [x] Add Element 2 and 3 Link (`el2_link`, `el3_link`, version hint 5, default on by the user's choice; Element 1 has none). Per the user, Link is a checkbox: on = the Element uses Element 1's Attack, Decay, Sustain, Release, and Time, off = its own. Resolved in `Engine::setParams`. While Link is on the Element's own Attack to Time controls are greyed out in the editor.
 
 ### Milestone 3: global processing
 

@@ -600,6 +600,57 @@ int main()
         check (f0 > 0.4 && f0 < 0.65 && f50 > 5.0 && f50 < 5.5 && f100 > 10.2 && f100 < 10.9, "Time scales Decay");
     }
 
+    // 18. Link: Elements 2 and 3 can follow Element 1's Attack, Decay, Sustain, Release, and Time.
+    // Element 1 is panned hard left and Element 2 hard right, so each channel is one Element.
+    {
+        const double sr = 48000.0;
+        auto play = [sr] (bool link, float el1Release, float el1Time, float el1Sustain, float el1Decay)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            p.elements[0].width = 20.0f; p.elements[0].pan = -100.0f; p.elements[0].release = el1Release;
+            p.elements[0].time = el1Time; p.elements[0].sustain = el1Sustain; p.elements[0].decay = el1Decay;
+            p.elements[1].enabled = true; p.elements[1].width = 20.0f; p.elements[1].pan = 100.0f;   // own settings: defaults
+            p.elements[1].link = link;
+            p.elements[0].link = true;   // Element 1 has no Link: this must be ignored
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) (sr * 7));
+            e.noteOff (60);
+            Capture d; renderBlocks (e, d, (int) (sr * 6));
+            return std::make_pair (c, d);
+        };
+        auto tail = [sr] (const std::vector<float>& x)
+        {
+            double last = 0;
+            for (int step = 0; step < 120; ++step)
+                if (rms (x, (size_t) (step * 0.05 * sr), (size_t) ((step + 1) * 0.05 * sr)) > 1.0e-6)
+                    last = (step + 1) * 0.05;
+            return last;
+        };
+
+        // Release: Element 1 has Release 25 (2.5 s), Element 2 keeps the default 0.5 s unless linked.
+        const auto unlinked = play (false, 25.0f, 50.0f, 100.0f, 0.0f);
+        const auto linked   = play (true,  25.0f, 50.0f, 100.0f, 0.0f);
+        const double leftTail = tail (unlinked.second.l), ownTail = tail (unlinked.second.r), linkedTail = tail (linked.second.r);
+        std::printf ("       tails: Element 1 %.2f s; Element 2 own %.2f s, linked %.2f s\n", leftTail, ownTail, linkedTail);
+        check (leftTail > 2.3 && leftTail < 2.7, "Element 1 keeps its own release (Link on Element 1 is ignored)");
+        check (ownTail > 0.4 && ownTail < 0.6, "unlinked Element 2 uses its own release");
+        check (linkedTail > 2.3 && linkedTail < 2.7, "linked Element 2 follows Element 1's release");
+
+        // Time follows too: Element 1 at Time 100 doubles a linked Element 2's default release.
+        const auto slow = play (true, 5.0f, 100.0f, 100.0f, 0.0f);
+        const double slowTail = tail (slow.second.r);
+        check (slowTail > 0.9 && slowTail < 1.1, "linked Element 2 follows Element 1's Time");
+
+        // Sustain and Decay follow: Element 1 sustains 50 (about -11 dB); Element 2 would otherwise stay at full level.
+        const auto own = play (false, 5.0f, 50.0f, 50.0f, 25.0f);
+        const auto sus = play (true,  5.0f, 50.0f, 50.0f, 25.0f);
+        const double ownDrop = 20.0 * std::log10 (rms (own.first.r, (size_t) (5.0 * sr), (size_t) (6.0 * sr)) / rms (own.first.r, (size_t) (0.1 * sr), (size_t) (0.4 * sr)));
+        const double linkedDrop = 20.0 * std::log10 (rms (sus.first.r, (size_t) (5.0 * sr), (size_t) (6.0 * sr)) / rms (sus.first.r, (size_t) (0.1 * sr), (size_t) (0.4 * sr)));
+        std::printf ("       Element 2 level after decay: own %.1f dB, linked %.1f dB\n", ownDrop, linkedDrop);
+        check (std::abs (ownDrop) < 1.0 && linkedDrop < -8.0 && linkedDrop > -13.0, "linked Element 2 follows Element 1's Decay and Sustain");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

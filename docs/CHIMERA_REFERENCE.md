@@ -164,6 +164,8 @@ Additional observations:
 
 Default envelope settings: Hold 0, Attack 0, Decay 0, Sustain 100, Release 5, Time 50.
 
+Link (Elements 2 and 3 only, per the user): a checkbox. When on, the Element uses Element 1's Attack, Decay, Sustain, Release, and Time; when off it uses its own.
+
 Time (`07_time_*.wav`, with the default recording as Time 50; everything else default): pitch (MIDI 60.05, 59.92, 60.01) and spectral skirts are unchanged. The release tail measures roughly 0.05 s, 0.45 s, and 0.8 s at Time 0, 50, and 100, about a Time/50 multiplier on the 0.5 s default Release. With Release 25 the tail scales the same way (about 0, 2.3 s, 4.7 s), so Time multiplies Release by about Time/50. The Time 100 file also has a soft onset (about 0.1 s), assumed to be MIDI keypress timing rather than Time. With Decay 50 and Sustain 0 the note fades away in about 0.5 s at Time 0, so Time scales Decay by the same factor (about 0.1 at Time 0).
 
 Decay and Sustain (`09_decay_*.wav`, `10_sustain_*.wav`, `11_combined_d030_s040.wav`; Filter Bypass so the level is steady white noise, default Time 50):
