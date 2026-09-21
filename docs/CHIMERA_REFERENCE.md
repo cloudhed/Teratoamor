@@ -121,7 +121,7 @@ Spectral measurements of `02_filter_*.wav` (44.1 kHz, note 60, Welch average; th
 | Peak Narrow | -50 dB | -83 dB | -90 dB | 4-pole, stage Q about 80; noise floor at or below -89 dB (may be recording-limited) |
 | Bypass | n/a | n/a | n/a | flat white noise, RMS about -29 dBFS, matching the default patch level |
 
-Hypotheses implemented (labelled uncertain): Narrow modes are two cascaded band-passes with stage Q equal to 0.3 x (BP Narrow) or 0.8 x (Peak Narrow) of the Width-derived Q; Peak modes add unfiltered noise (gain 0.36 wide, 0.003 narrow, relative to unit-RMS noise); Off silences the Element. The Off behaviour is an assumption, since no recording of it exists.
+Hypotheses implemented (labelled uncertain): Narrow modes are two cascaded band-passes, but the September 2026 matched Width batch showed that fixed stage-Q multipliers were inaccurate away from Width 90. BP Narrow and Peak Narrow now use independent log-interpolated per-stage Q curves at Width 0, 25, 50, 75, 90, and 100. Peak Wide uses the ordinary Width mapping through 90 and caps Q at 100 above it. Peak modes add a small, Width-dependent unfiltered-noise component fitted after the Q curves. Off silences the Element. The Off behaviour is an assumption, since no recording of it exists. Full measurements and implementation targets are recorded in `WIDTH_COMPARISON.md`.
 
 These descriptions identify audible targets. Filter topology and numerical implementation must be independently designed.
 
@@ -187,4 +187,3 @@ When refining behaviour:
 3. Record conclusions here as measurements or hypotheses; label uncertainty clearly.
 4. Implement from general DSP knowledge without examining prohibited executable code.
 5. Use original Teratoamor names and visual presentation for all shipped features and presets.
-

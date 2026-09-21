@@ -138,7 +138,7 @@ public:
             const float midiNote = static_cast<float> (playingNote) + frame.pitchOffsetSemitones;
             const float hz = 440.0f * std::exp2 ((midiNote - 69.0f) / 12.0f);
             el.filter.setMode (frame.mode);
-            el.filter.setParameters (hz, ResonantBandpass::widthToQ (frame.width01), sampleRate);
+            el.filter.setParameters (hz, frame.width01, sampleRate);
             el.shaper.setParameters (frame.warp01, frame.clip01);
 
             const float gain = targetRms * playingVelocity;

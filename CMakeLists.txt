@@ -62,3 +62,8 @@ enable_testing()
 add_executable(TeratoamorEngineTests Tests/EngineTests.cpp Source/DSP/Engine.cpp)
 target_include_directories(TeratoamorEngineTests PRIVATE Source)
 add_test(NAME EngineTests COMMAND TeratoamorEngineTests)
+
+# Offline research renderer used for matched clean-room listening and spectral comparisons.
+# It uses the same JUCE-free DSP engine as the tests and writes only to a caller-selected folder.
+add_executable(TeratoamorWidthRenderer Tests/WidthRenderer.cpp Source/DSP/Engine.cpp)
+target_include_directories(TeratoamorWidthRenderer PRIVATE Source)
