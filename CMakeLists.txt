@@ -1,0 +1,44 @@
+cmake_minimum_required(VERSION 3.22)
+
+project(Teratoamor VERSION 0.0.1 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# JUCE is pinned as a Git submodule and is never modified.
+add_subdirectory(external/JUCE)
+
+juce_add_plugin(Teratoamor
+    PRODUCT_NAME "Teratoamor"
+    COMPANY_NAME "Teratoamor Project"
+    BUNDLE_ID "org.teratoamor.teratoamor"
+    PLUGIN_MANUFACTURER_CODE Tprj
+    PLUGIN_CODE Trat
+    FORMATS VST3 Standalone
+    IS_SYNTH TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    VST3_CATEGORIES Instrument Synth
+    COPY_PLUGIN_AFTER_BUILD FALSE)
+
+target_sources(Teratoamor PRIVATE
+    Source/PluginProcessor.cpp
+    Source/PluginProcessor.h
+    Source/PluginEditor.cpp
+    Source/PluginEditor.h)
+
+target_compile_definitions(Teratoamor PUBLIC
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0)
+
+target_link_libraries(Teratoamor
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
