@@ -93,11 +93,11 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Milestone 1 verification
 
-- [ ] Exercise MIDI note-on, note-off, overlapping notes, and voice stealing.
-- [ ] Test common sample rates and audio buffer sizes.
-- [ ] Confirm the real-time audio path performs no allocation and takes no locks.
-- [ ] Stress Width near 100 across the supported pitch range.
-- [ ] Confirm silence and finite output after resets, rapid parameter changes, and state restoration.
+- [x] Exercise MIDI note-on, note-off, overlapping notes, and voice stealing (note-on, note-off, and overlapping notes user-confirmed in Cubase; voice stealing covered by the engine test with 20 overlapping notes, not yet confirmed by ear).
+- [x] Test common sample rates and audio buffer sizes (engine tests: sample rates 22.05 to 192 kHz, and buffer sizes 1 to 2048 giving the same level within 0.01 dB; not yet run in a real host at each setting).
+- [x] Confirm the real-time audio path performs no allocation and takes no locks (engine test counts heap allocations across 300 blocks of notes, parameter changes, and rendering: zero; code review of `processBlock` and `Source/DSP` found no locks, strings, or containers. The JUCE host layer itself was not instrumented).
+- [x] Stress Width near 100 across the supported pitch range (engine tests: Width 0 to 100 at every third note from 0 to 127, five sample rates, with rapid changes, in every filter mode).
+- [x] Confirm silence and finite output after resets, rapid parameter changes, and state restoration (engine tests cover reset and rapid changes; state restoration was confirmed by the user in Cubase).
 - [ ] Compare pitch, Width response, envelope timing, and stereo behaviour with permitted clean-room measurements.
 - [x] Confirm saved sessions restore the audible state.
 

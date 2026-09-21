@@ -2,10 +2,34 @@
 #include "DSP/Engine.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
+#include <new>
 #include <vector>
+
+// Counts heap allocations while a test asks for it, to prove the audio path never allocates.
+namespace
+{
+    std::atomic<long> allocationCount { 0 };
+    std::atomic<bool> countAllocations { false };
+}
+
+void* operator new (std::size_t size)
+{
+    if (countAllocations.load())
+        ++allocationCount;
+
+    if (void* memory = std::malloc (size != 0 ? size : 1))
+        return memory;
+
+    throw std::bad_alloc();
+}
+
+void operator delete (void* memory) noexcept { std::free (memory); }
+void operator delete (void* memory, std::size_t) noexcept { std::free (memory); }
 
 namespace
 {
@@ -649,6 +673,101 @@ int main()
         const double linkedDrop = 20.0 * std::log10 (rms (sus.first.r, (size_t) (5.0 * sr), (size_t) (6.0 * sr)) / rms (sus.first.r, (size_t) (0.1 * sr), (size_t) (0.4 * sr)));
         std::printf ("       Element 2 level after decay: own %.1f dB, linked %.1f dB\n", ownDrop, linkedDrop);
         check (std::abs (ownDrop) < 1.0 && linkedDrop < -8.0 && linkedDrop > -13.0, "linked Element 2 follows Element 1's Decay and Sustain");
+    }
+
+    // 19. The audio path never allocates memory: note handling, parameter changes, and rendering with
+    // every feature in use, counted with a replaced global operator new.
+    {
+        static float left[512], right[512];
+
+        // Self-check: the counter must notice a deliberate allocation, or a zero result means nothing.
+        allocationCount = 0;
+        countAllocations = true;
+        {
+            std::vector<int> deliberate (64, 1);
+            left[0] = (float) deliberate[0];
+        }
+        countAllocations = false;
+        check (allocationCount > 0, "allocation counter detects a deliberate allocation");
+
+        Engine e; e.prepare (48000.0);
+        auto p = defaultParams();
+        for (size_t i = 0; i < p.elements.size(); ++i)
+        {
+            auto& el = p.elements[i];
+            el.enabled = true; el.warp = 60.0f; el.clip = 70.0f; el.decay = 20.0f; el.sustain = 30.0f; el.link = (i != 0);
+        }
+        e.setParams (p);
+
+        allocationCount = 0;
+        countAllocations = true;
+
+        for (int block = 0; block < 300; ++block)
+        {
+            for (size_t i = 0; i < p.elements.size(); ++i)
+            {
+                p.elements[i].filterMode = static_cast<FilterMode> ((block + (int) i) % 6);
+                p.elements[i].width = (float) ((block * 7) % 101);
+                p.elements[i].link = (block % 5) != 0 && i != 0;
+            }
+            e.setParams (p);
+            e.noteOn (36 + (block * 5) % 60, 0.8f);
+            if (block % 3 == 0) e.noteOff (36 + ((block - 3) * 5) % 60);
+            if (block % 40 == 0) { e.setSustainPedal (block % 80 == 0); e.setPitchBend (block % 80 == 0 ? 1.0f : -1.0f); }
+            e.render (left, right, 512);
+        }
+        e.allNotesOff();
+        e.reset();
+
+        countAllocations = false;
+        std::printf ("       heap allocations during 300 blocks: %ld\n", (long) allocationCount.load());
+        check (allocationCount == 0, "audio path performs no heap allocation");
+    }
+
+    // 20. Common buffer sizes: finite output and the same level whatever the block size.
+    {
+        const double sr = 48000.0;
+        double lowest = 1.0e9, highest = -1.0e9;
+        bool ok = true;
+        for (int size : { 1, 2, 7, 16, 17, 32, 64, 100, 128, 256, 480, 512, 1024, 2048 })
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].width = 20.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            std::vector<float> l ((size_t) size), r ((size_t) size), all;
+            for (int done = 0; done < (int) sr * 2; done += size)
+            {
+                e.render (l.data(), r.data(), size);
+                all.insert (all.end(), l.begin(), l.end());
+            }
+            Capture c; c.l = all; c.r = all;
+            ok = ok && allFinite (c);
+            const double level = 20.0 * std::log10 (rms (all, (size_t) sr, all.size()));
+            lowest = std::min (lowest, level); highest = std::max (highest, level);
+        }
+        std::printf ("       level across 14 buffer sizes: %.2f to %.2f dB\n", lowest, highest);
+        check (ok && highest - lowest < 1.0, "buffer sizes 1 to 2048 give finite output and the same level");
+    }
+
+    // 21. After a reset the engine is silent, then plays normally again.
+    {
+        Engine e; e.prepare (48000.0);
+        auto p = defaultParams();
+        for (auto& el : p.elements) { el.enabled = true; el.width = 100.0f; el.warp = 100.0f; el.clip = 100.0f; }
+        e.setParams (p);
+        for (int note = 40; note < 80; note += 4) e.noteOn (note, 1.0f);
+        Capture before; renderBlocks (e, before, 24000);
+        e.setSustainPedal (true);
+        e.reset();
+        Capture silent; renderBlocks (e, silent, 24000);
+        check (rms (before.l, 12000, 24000) > 0.001 && rms (silent.l, 0, silent.l.size()) == 0.0, "silent immediately after reset");
+        e.setParams (defaultParams());
+        e.noteOn (60, 1.0f);
+        Capture again; renderBlocks (e, again, 48000);
+        check (allFinite (again) && rms (again.l, 24000, 48000) > 0.005, "plays normally after reset (sustain pedal cleared)");
+        e.noteOff (60);
+        Capture tail; renderBlocks (e, tail, 48000);
+        check (rms (tail.l, 30000, 48000) == 0.0, "notes still release after reset");
     }
 
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
