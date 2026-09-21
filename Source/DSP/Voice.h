@@ -29,6 +29,7 @@ class Voice
 {
 public:
     static constexpr int   maxChunk = 16;               // control-rate update interval (samples)
+    static constexpr float decaySecondsPerUnit = 0.066f; // provisional: Decay 50 falls in about 3.3 s at Time 50
     static constexpr float targetRms = 0.15f;           // level of one full-scale Element before gain
 
     void prepare (double newSampleRate, int voiceIndex) noexcept
@@ -96,7 +97,10 @@ public:
         }
 
         for (int e = 0; e < EngineParams::numElements; ++e)
-            elements[(size_t) e].envelope.noteOff (params.elements[(size_t) e].release * 0.1f);
+        {
+            const auto& p = params.elements[(size_t) e];
+            elements[(size_t) e].envelope.noteOff (p.release * 0.1f * timeScale (p.time));
+        }
     }
 
     void kill() noexcept
@@ -174,7 +178,9 @@ private:
         {
             elements[(size_t) e].filter.reset();
             elements[(size_t) e].shaper.reset();
-            elements[(size_t) e].envelope.noteOn (latestParams.elements[(size_t) e].attack * 0.1f);
+            const auto& p = latestParams.elements[(size_t) e];
+            elements[(size_t) e].envelope.noteOn (p.attack * 0.1f, p.hold * 0.1f,
+                                                  p.decay * decaySecondsPerUnit * timeScale (p.time), p.sustain * 0.01f);
         }
     }
 

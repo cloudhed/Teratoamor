@@ -162,6 +162,15 @@ Additional observations:
 - The Attack shape is strongly curved, approximately cubic rather than a linear gain ramp.
 - Full reference recordings are available locally for later clean-room measurement.
 
+Time (`07_time_000.wav`, `07_time_100.wav`, with the default recording as Time 50; everything else default): pitch (MIDI 60.05, 59.92, 60.01) and spectral skirts are unchanged. The release tail measures roughly 0.05 s, 0.45 s, and 0.8 s at Time 0, 50, and 100, about a Time/50 multiplier on the 0.5 s default Release. The Time 100 file also has a soft onset (about 0.1 s), assumed to be MIDI keypress timing rather than Time. Further recordings (`07_time_{000,050,100}_release_025.wav` and `07_time_{000,050,100}_decay_050_sustain_000.wav`): with Release 25 the tail scales the same way (about 0, 2.3 s, 4.7 s at Time 0, 50, 100), so Time is a multiplier of about Time/50 on Release. With Decay 50 and Sustain 0 the note fades away in about 0.5 s at Time 0, and is still fading at about 3.5 s (Time 50) and about 4 s (Time 100), where the key was presumably released; fitted linear decay lengths are about 0.45 s, 3-3.5 s, and 6-7 s, so Time scales Decay by the same factor and Decay 50 is about 3.3 s, not 5 s. The level readings are noisy (about +/-30% from the narrowband resonator), so the decay shape (linear versus exponential) is not settled. Not yet known: whether Time affects Attack or Hold.
+
+Hold, Decay, and Sustain on their own (listed per Element in the VSTXML export) have no recordings yet; Decay was only seen through the Time recordings above. The factory program data is an opaque binary chunk and was not decoded. Teratoamor's Hold, Decay, and Sustain are provisional assumptions. Recordings that would settle this (default patch, Element 1, note 60, held about 12 seconds, then released; change one control at a time):
+
+- `07_hold_025/050/075/100`: Hold only.
+- `08_decay_025/050/075/100`: Decay only, with Sustain 0 and Hold 0.
+- `09_sustain_000/025/050/075`: Sustain only, with Decay about 50.
+- Time with Hold at 50 (to see whether Time scales Hold), and the decay shape with the note held about 12 seconds so the whole fall is visible.
+
 ## Measurement practice
 
 When refining behaviour:

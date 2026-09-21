@@ -470,6 +470,120 @@ int main()
         check (ok, "Warp and Clip extremes finite and bounded across modes, pitches, sample rates");
     }
 
+    // 16. Hold, Decay, Sustain (provisional): Attack -> Hold -> Decay -> Sustain -> Release.
+    {
+        const double sr = 48000.0;
+        auto windowDb = [] (const Capture& c, double from, double to, double rate)
+        {
+            return 20.0 * std::log10 (rms (c.l, (size_t) (from * rate), (size_t) (to * rate)) + 1.0e-12);
+        };
+
+        // Hold 2 s, Decay about 1 s (15 units), Sustain 50%: full level, then a fall to -6 dB, then steady.
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            p.elements[0].width = 20.0f;   // broad band: steady RMS readings
+            p.elements[0].hold = 20.0f; p.elements[0].decay = 15.0f; p.elements[0].sustain = 50.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 6);
+            const double start = windowDb (c, 0.2, 0.7, sr), held = windowDb (c, 1.4, 1.9, sr);
+            const double falling = windowDb (c, 2.4, 2.6, sr), settled = windowDb (c, 4.0, 5.0, sr);
+            std::printf ("       levels (dB): start %.1f, hold %.1f, mid-decay %.1f, sustain %.1f\n", start, held, falling, settled);
+            check (std::abs (held - start) < 1.0, "Hold keeps full level");
+            check (falling < held - 1.5 && falling > settled + 0.5, "Decay falls gradually");
+            check (std::abs ((held - settled) - 6.0) < 1.0, "Sustain 50% settles 6 dB down");
+            e.noteOff (60);
+            Capture d; renderBlocks (e, d, (int) sr);
+            check (rms (d.l, (size_t) (0.8 * sr), (size_t) sr) == 0.0, "Release from the sustain stage reaches silence");
+        }
+
+        // Sustain 0: the sound decays away completely while the key is still held.
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            p.elements[0].width = 20.0f; p.elements[0].decay = 5.0f; p.elements[0].sustain = 0.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 3);
+            check (windowDb (c, 0.05, 0.15, sr) > windowDb (c, 0.3, 0.4, sr) && rms (c.l, (size_t) (2 * sr), (size_t) (3 * sr)) == 0.0,
+                   "Sustain 0 decays to silence while the key is held");
+            e.noteOff (60);
+            Capture d; renderBlocks (e, d, (int) sr);
+            check (rms (d.l, 0, d.l.size()) == 0.0, "releasing a fully decayed note stays silent");
+        }
+
+        // Defaults (Hold 0, Sustain 100) leave the earlier envelope behaviour untouched.
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].width = 20.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 4);
+            check (std::abs (windowDb (c, 0.2, 0.7, sr) - windowDb (c, 3.0, 4.0, sr)) < 1.0, "default Sustain 100 holds full level");
+        }
+    }
+
+    // 17. Time (provisional) scales the release tail: about 0.05 s at Time 0, unchanged at 50, twice as long at 100.
+    {
+        const double sr = 48000.0;
+        // Seconds from key-up until the output is silent (checked in 50 ms steps).
+        auto tailSeconds = [sr] (float time)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].width = 20.0f; p.elements[0].time = time;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr);
+            e.noteOff (60);
+            Capture d; renderBlocks (e, d, (int) (sr * 3));
+            double last = 0;
+            for (int step = 0; step < 60; ++step)
+                if (rms (d.l, (size_t) (step * 0.05 * sr), (size_t) ((step + 1) * 0.05 * sr)) > 1.0e-6)
+                    last = (step + 1) * 0.05;
+            return last;
+        };
+
+        const double t0 = tailSeconds (0.0f), t50 = tailSeconds (50.0f), t100 = tailSeconds (100.0f);
+        std::printf ("       release tail: Time 0 %.2f s, Time 50 %.2f s, Time 100 %.2f s (reference about 0.05 / 0.45 / 0.8 s)\n", t0, t50, t100);
+        check (t0 <= 0.1, "Time 0 gives a very short release");
+        check (t50 > 0.4 && t50 <= 0.6, "Time 50 leaves the default 0.5 s release unchanged");
+        check (t100 > 0.9 && t100 <= 1.1, "Time 100 doubles the release tail");
+
+        // With Release 25 (2.5 s) the tail should scale the same way: about 2.5 s at Time 50, 5 s at 100.
+        auto longTail = [sr] (float time)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].width = 20.0f; p.elements[0].time = time; p.elements[0].release = 25.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr);
+            e.noteOff (60);
+            Capture d; renderBlocks (e, d, (int) (sr * 8));
+            double last = 0;
+            for (int step = 0; step < 160; ++step)
+                if (rms (d.l, (size_t) (step * 0.05 * sr), (size_t) ((step + 1) * 0.05 * sr)) > 1.0e-6)
+                    last = (step + 1) * 0.05;
+            return last;
+        };
+        const double l50 = longTail (50.0f), l100 = longTail (100.0f);
+        std::printf ("       Release 25 tail: Time 50 %.2f s, Time 100 %.2f s (reference about 2.3 / 4.7 s)\n", l50, l100);
+        check (l50 > 2.3 && l50 <= 2.7 && l100 > 4.8 && l100 <= 5.2, "Time scales a longer Release the same way");
+
+        // A Decay 50 / Sustain 0 note fades away by itself: quickly at Time 0, slowly at Time 100.
+        auto fadeSeconds = [sr] (float time)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams(); p.elements[0].width = 20.0f; p.elements[0].time = time;
+            p.elements[0].decay = 50.0f; p.elements[0].sustain = 0.0f;
+            e.setParams (p); e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) (sr * 10));
+            double last = 0;
+            for (int step = 0; step < 200; ++step)
+                if (rms (c.l, (size_t) (step * 0.05 * sr), (size_t) ((step + 1) * 0.05 * sr)) > 1.0e-6)
+                    last = (step + 1) * 0.05;
+            return last;
+        };
+        const double f0 = fadeSeconds (0.0f), f50 = fadeSeconds (50.0f), f100 = fadeSeconds (100.0f);
+        std::printf ("       Decay 50 fades out in: Time 0 %.2f s, Time 50 %.2f s, Time 100 %.2f s (reference about 0.5 / 3.5 / 6.5 s, noisy)\n", f0, f50, f100);
+        check (f0 > 0.2 && f0 < 0.7 && f50 > 3.0 && f50 < 3.8 && f100 > 6.0 && f100 < 7.2, "Time scales Decay");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

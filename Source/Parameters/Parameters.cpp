@@ -8,6 +8,7 @@ namespace
     constexpr int versionHint = 1;
     constexpr int versionHint2 = 2;   // Milestone 2: Element filter mode
     constexpr int versionHint3 = 3;   // Milestone 2: Warp and Clip
+    constexpr int versionHint4 = 4;   // Milestone 2: Hold, Decay, Sustain
 
     juce::ParameterID makeID (const juce::String& id, int version = versionHint)
     {
@@ -73,6 +74,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
         layout.add (std::make_unique<AudioParameterFloat> (
             makeID (ParamIDs::width (e)), prefix + "Width",
             NormalisableRange<float> (0.0f, 100.0f, 0.1f), 90.0f,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::time (e), versionHint4), prefix + "Time",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::hold (e), versionHint4), prefix + "Hold",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::decay (e), versionHint4), prefix + "Decay",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 5.0f));
+
+        layout.add (std::make_unique<AudioParameterFloat> (
+            makeID (ParamIDs::sustain (e), versionHint4), prefix + "Sustain",
+            NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f,
             juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
         layout.add (std::make_unique<AudioParameterFloat> (
