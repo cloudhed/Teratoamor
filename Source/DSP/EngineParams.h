@@ -1,0 +1,26 @@
+#pragma once
+
+#include <array>
+
+// Plain-data snapshot of the user-facing controls, read once per audio block.
+// It has no JUCE dependency, so the DSP can be tested without a plugin host.
+struct ElementParams
+{
+    bool  enabled  = false;
+    int   octave   = 0;
+    int   semitone = 0;
+    float fineCents = 0.0f;
+    float width    = 90.0f;    // 0..100
+    float attack   = 0.0f;     // 0..100 (control value; 10 units = 1 second)
+    float release  = 5.0f;     // 0..100
+    float level    = 80.0f;    // 0..100
+    float pan      = 0.0f;     // -100..100
+};
+
+struct EngineParams
+{
+    static constexpr int numElements = 3;
+
+    float master = 70.0f;      // 0..100
+    std::array<ElementParams, numElements> elements;
+};

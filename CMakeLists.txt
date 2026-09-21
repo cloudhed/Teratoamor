@@ -27,7 +27,19 @@ target_sources(Teratoamor PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
-    Source/PluginEditor.h)
+    Source/PluginEditor.h
+    Source/Parameters/ParameterIDs.h
+    Source/Parameters/Parameters.cpp
+    Source/Parameters/Parameters.h
+    Source/DSP/Engine.cpp
+    Source/DSP/Engine.h
+    Source/DSP/EngineParams.h
+    Source/DSP/ElementEnvelope.h
+    Source/DSP/NoiseSource.h
+    Source/DSP/ResonantBandpass.h
+    Source/DSP/Voice.h)
+
+target_include_directories(Teratoamor PRIVATE Source)
 
 target_compile_definitions(Teratoamor PUBLIC
     JUCE_WEB_BROWSER=0
@@ -42,3 +54,9 @@ target_link_libraries(Teratoamor
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# DSP tests: the engine has no JUCE dependency, so it is tested as a plain console program.
+enable_testing()
+add_executable(TeratoamorEngineTests Tests/EngineTests.cpp Source/DSP/Engine.cpp)
+target_include_directories(TeratoamorEngineTests PRIVATE Source)
+add_test(NAME EngineTests COMMAND TeratoamorEngineTests)

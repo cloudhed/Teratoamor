@@ -19,22 +19,26 @@ The intended repository licence is AGPLv3 while JUCE is used under its AGPLv3 op
 
 ## Current status
 
-Only the following setup work is complete:
+Complete:
 
 - [x] Development environment setup: VS Code workflow, CMake 4.4.3, and Visual Studio 18 Build Tools
 - [x] JUCE integration: JUCE 9.0.2 pinned as the `external/JUCE` Git submodule
+- [x] Phase 0 project skeleton (VST3 + Standalone build; silent processor)
+- [x] Parameter IDs, ranges, and host state save/restore for master level and three Elements (on, octave, semitone, fine, width, attack, release, level, pan), with a temporary generic GUI
 
-All product implementation remains pending. In particular, there is no root CMake project or plugin implementation yet.
+- [x] First sound: 8-voice engine in `Source/DSP/` (seeded noise -> stability-guarded TPT band-pass -> cubic-attack/linear-release envelope, per Element), MIDI note on/off with sample-accurate timing, and `TeratoamorEngineTests` (`build\Debug\TeratoamorEngineTests.exe`)
+
+Still pending for Milestone 1: Cubase 10 / standalone MIDI verification by ear, sustain pedal, pitch bend, level calibration against the reference recordings, and the remaining verification items.
 
 ## Phase 0: project skeleton
 
-- [ ] Add the root `CMakeLists.txt` without modifying `external/JUCE`.
-- [ ] Define VST3 instrument and standalone targets for Windows x64.
-- [ ] Add a minimal source layout that keeps DSP, parameters/state, and GUI concerns separate.
-- [ ] Establish warning settings and Debug build defaults suitable for MSVC.
-- [ ] Add the intended AGPLv3 repository licence and required notices.
-- [ ] Configure successfully and record the generated build directory.
-- [ ] Build both targets and report their exact artifact locations.
+- [x] Add the root `CMakeLists.txt` without modifying `external/JUCE`.
+- [x] Define VST3 instrument and standalone targets for Windows x64.
+- [x] Add a minimal source layout that keeps DSP, parameters/state, and GUI concerns separate.
+- [x] Establish warning settings and Debug build defaults suitable for MSVC.
+- [x] Add the intended AGPLv3 repository licence and required notices.
+- [x] Configure successfully and record the generated build directory.
+- [x] Build both targets and report their exact artifact locations.
 
 Expected initial commands once `CMakeLists.txt` exists:
 
@@ -51,34 +55,34 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Build and host integration
 
-- [ ] Produce a Windows x64 VST3.
-- [ ] Produce a Windows x64 standalone application.
+- [x] Produce a Windows x64 VST3.
+- [x] Produce a Windows x64 standalone application.
 - [ ] Verify that the VST3 is discoverable and loads in Cubase 10.
 - [ ] Verify that the standalone application starts and accepts MIDI input.
 
 ### Voice engine
 
-- [ ] Implement eight-voice polyphony with a clear voice-allocation policy.
-- [ ] Generate three independent white-noise Elements per voice.
-- [ ] Use deterministic, independently seeded noise sources for each voice and Element.
-- [ ] Tune resonators from MIDI notes, with note 60 targeting middle C.
-- [ ] Add octave, semitone, and fine-detune controls per Element.
+- [x] Implement eight-voice polyphony with a clear voice-allocation policy.
+- [x] Generate three independent white-noise Elements per voice.
+- [x] Use deterministic, independently seeded noise sources for each voice and Element.
+- [x] Tune resonators from MIDI notes, with note 60 targeting middle C.
+- [x] Add octave, semitone, and fine-detune controls per Element.
 
 ### Element signal path
 
-- [ ] Implement a stable resonant band-pass mode.
-- [ ] Implement Width using the measured mapping documented in `CHIMERA_REFERENCE.md`.
-- [ ] Clamp extreme resonance safely and test for NaN, infinity, and runaway output.
-- [ ] Add an amplitude envelope per Element.
-- [ ] Start with the measured approximately linear time mapping and curved Attack response.
-- [ ] Add level and pan per Element.
+- [x] Implement a stable resonant band-pass mode.
+- [x] Implement Width using the measured mapping documented in `CHIMERA_REFERENCE.md`.
+- [x] Clamp extreme resonance safely and test for NaN, infinity, and runaway output.
+- [x] Add an amplitude envelope per Element.
+- [x] Start with the measured approximately linear time mapping and curved Attack response.
+- [x] Add level and pan per Element.
 
 ### Parameters, state, and GUI
 
-- [ ] Define stable parameter IDs and practical ranges.
-- [ ] Smooth continuously adjustable audio parameters.
-- [ ] Save and restore parameter state through the host.
-- [ ] Add master level.
+- [x] Define stable parameter IDs and practical ranges.
+- [x] Smooth continuously adjustable audio parameters.
+- [x] Save and restore parameter state through the host.
+- [x] Add master level.
 - [ ] Build a simple, functional, original JUCE GUI for the Milestone 1 controls.
 - [ ] Avoid Chimera branding, artwork, silhouette, layout trade dress, and preset names.
 

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "DSP/Engine.h"
+#include "Parameters/ParameterIDs.h"
+#include "Parameters/Parameters.h"
 
 class TeratoamorAudioProcessor final : public juce::AudioProcessor
 {
@@ -35,6 +38,29 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState apvts;
+
 private:
+    EngineParams readParams() const noexcept;
+
+    // Raw parameter values, looked up once so the audio thread never searches by name.
+    struct ElementParamPointers
+    {
+        std::atomic<float>* enabled = nullptr;
+        std::atomic<float>* octave = nullptr;
+        std::atomic<float>* semitone = nullptr;
+        std::atomic<float>* fine = nullptr;
+        std::atomic<float>* width = nullptr;
+        std::atomic<float>* attack = nullptr;
+        std::atomic<float>* release = nullptr;
+        std::atomic<float>* level = nullptr;
+        std::atomic<float>* pan = nullptr;
+    };
+
+    std::atomic<float>* masterLevelParam = nullptr;
+    std::array<ElementParamPointers, ParamIDs::numElements> elementParams;
+
+    Engine engine;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TeratoamorAudioProcessor)
 };
