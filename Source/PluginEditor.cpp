@@ -8,6 +8,7 @@ namespace
     constexpr int labelWidth = 70;
     constexpr int titleHeight = 44;
     constexpr int groupTopPadding = 22;
+    constexpr int filterStripHeight = groupTopPadding + rowHeight + 6;   // global filter group
     constexpr int linesPerPanel = 16;   // on, filter, 8 tone sliders, link line, 5 envelope sliders
 }
 
@@ -36,6 +37,26 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
     master = std::make_unique<SliderRow> (state, ParamIDs::masterLevel, "Master");
     addAndMakeVisible (master->label);
     addAndMakeVisible (master->slider);
+
+    filterGroup.setText ("Global filter");
+    addAndMakeVisible (filterGroup);
+
+    filterTypeLabel.setText ("Type", juce::dontSendNotification);
+    addAndMakeVisible (filterTypeLabel);
+    addAndMakeVisible (filterType);
+
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (ParamIDs::filterType)))
+        filterType.addItemList (choice->choices, 1);
+
+    filterTypeAttachment = std::make_unique<ComboBoxAttachment> (state, ParamIDs::filterType, filterType);
+
+    filterQ = std::make_unique<SliderRow> (state, ParamIDs::filterQ, "Q");
+    addAndMakeVisible (filterQ->label);
+    addAndMakeVisible (filterQ->slider);
+
+    filterCutoff = std::make_unique<SliderRow> (state, ParamIDs::filterCutoff, "Cutoff");
+    addAndMakeVisible (filterCutoff->label);
+    addAndMakeVisible (filterCutoff->slider);
 
     for (int e = 0; e < ParamIDs::numElements; ++e)
     {
@@ -102,7 +123,7 @@ TeratoamorAudioProcessorEditor::TeratoamorAudioProcessorEditor (TeratoamorAudioP
     }
 
     setSize (4 * margin + 3 * panelWidth,
-             titleHeight + groupTopPadding + linesPerPanel * rowHeight + 3 * margin);
+             titleHeight + filterStripHeight + margin + groupTopPadding + linesPerPanel * rowHeight + 3 * margin);
 
     refreshLinkState();
     startTimerHz (10);   // picks up Link changes made by the host (automation, session load)
@@ -150,6 +171,22 @@ void TeratoamorAudioProcessorEditor::resized()
     auto masterArea = top.removeFromRight (360);
     master->label.setBounds (masterArea.removeFromLeft (labelWidth));
     master->slider.setBounds (masterArea);
+
+    area.removeFromTop (margin);
+
+    auto strip = area.removeFromTop (filterStripHeight);
+    filterGroup.setBounds (strip);
+    auto stripInner = strip.reduced (margin, 0).withTrimmedTop (groupTopPadding);
+    auto typeArea = stripInner.removeFromLeft (200);
+    filterTypeLabel.setBounds (typeArea.removeFromLeft (50));
+    filterType.setBounds (typeArea.reduced (0, 2));
+    stripInner.removeFromLeft (margin);
+    auto qArea = stripInner.removeFromLeft (stripInner.getWidth() / 2);
+    filterQ->label.setBounds (qArea.removeFromLeft (30));
+    filterQ->slider.setBounds (qArea);
+    stripInner.removeFromLeft (margin);
+    filterCutoff->label.setBounds (stripInner.removeFromLeft (50));
+    filterCutoff->slider.setBounds (stripInner);
 
     area.removeFromTop (margin);
 

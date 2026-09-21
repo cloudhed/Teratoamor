@@ -10,6 +10,7 @@ namespace
     constexpr int versionHint3 = 3;   // Milestone 2: Warp and Clip
     constexpr int versionHint4 = 4;   // Milestone 2: Time, Decay, Sustain
     constexpr int versionHint5 = 5;   // Milestone 2: Link
+    constexpr int versionHint6 = 6;   // Milestone 3: global filter
 
     juce::ParameterID makeID (const juce::String& id, int version = versionHint)
     {
@@ -35,6 +36,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout Parameters::createLayout()
     layout.add (std::make_unique<AudioParameterFloat> (
         makeID (ParamIDs::masterLevel), "Master Level",
         NormalisableRange<float> (0.0f, 100.0f, 0.1f), 70.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
+    // Global filter. Choice order matches the GlobalFilterType enum and is stored by hosts; never reorder it.
+    layout.add (std::make_unique<AudioParameterChoice> (
+        makeID (ParamIDs::filterType, versionHint6), "Filter Type",
+        juce::StringArray { "Bypass", "Lowpass", "Highpass", "Bandpass", "Bandreject", "Peak" }, 0));
+
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::filterQ, versionHint6), "Filter Q",
+        NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<AudioParameterFloat> (
+        makeID (ParamIDs::filterCutoff, versionHint6), "Filter Cutoff",
+        NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction (percentText)));
 
     for (int e = 0; e < ParamIDs::numElements; ++e)

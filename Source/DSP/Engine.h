@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EngineParams.h"
+#include "GlobalFilter.h"
 #include "Voice.h"
 
 #include <array>
@@ -70,6 +71,8 @@ private:
     std::array<Voice, numVoices> voices;
     std::array<ElementSmoothers, EngineParams::numElements> smoothers;
     Smoothed master, pitchBend;
+    Smoothed filterCutoff, filterQ;   // global filter knobs, 0..1
+    GlobalFilter globalFilter;
     bool sustainDown = false;
     std::array<bool, numVoices> releaseDeferred {};
     std::uint64_t noteCounter = 0;

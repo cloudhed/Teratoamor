@@ -6,6 +6,9 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
       apvts (*this, nullptr, Parameters::stateType, Parameters::createLayout())
 {
     masterLevelParam = apvts.getRawParameterValue (ParamIDs::masterLevel);
+    filterTypeParam = apvts.getRawParameterValue (ParamIDs::filterType);
+    filterCutoffParam = apvts.getRawParameterValue (ParamIDs::filterCutoff);
+    filterQParam = apvts.getRawParameterValue (ParamIDs::filterQ);
 
     for (int e = 0; e < ParamIDs::numElements; ++e)
     {
@@ -43,6 +46,9 @@ EngineParams TeratoamorAudioProcessor::readParams() const noexcept
 {
     EngineParams out;
     out.master = masterLevelParam->load();
+    out.globalFilter.type = static_cast<GlobalFilterType> (juce::jlimit (0, 5, juce::roundToInt (filterTypeParam->load())));
+    out.globalFilter.cutoff = filterCutoffParam->load();
+    out.globalFilter.q = filterQParam->load();
 
     for (size_t e = 0; e < elementParams.size(); ++e)
     {

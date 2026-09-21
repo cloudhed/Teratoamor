@@ -14,6 +14,17 @@ enum class FilterMode
     peakNarrow
 };
 
+// Global filter type. The order is stored by the host as a choice index and must not change.
+enum class GlobalFilterType
+{
+    bypass = 0,
+    lowpass,
+    highpass,
+    bandpass,
+    bandreject,
+    peak
+};
+
 // Plain-data snapshot of the user-facing controls, read once per audio block.
 // It has no JUCE dependency, so the DSP can be tested without a plugin host.
 // The Decay and Release lengths are multiplied by this factor (Time 50 = unchanged).
@@ -45,10 +56,18 @@ struct ElementParams
     float pan      = 0.0f;     // -100..100
 };
 
+struct GlobalFilterParams
+{
+    GlobalFilterType type = GlobalFilterType::bypass;
+    float cutoff = 100.0f;   // 0..100
+    float q      = 0.0f;     // 0..100
+};
+
 struct EngineParams
 {
     static constexpr int numElements = 3;
 
     float master = 70.0f;      // 0..100
     std::array<ElementParams, numElements> elements;
+    GlobalFilterParams globalFilter;
 };

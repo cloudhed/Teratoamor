@@ -770,6 +770,74 @@ int main()
         check (rms (tail.l, 30000, 48000) == 0.0, "notes still release after reset");
     }
 
+    // 22. Global filter: each type has its textbook shape on white noise.
+    {
+        auto playGlobal = [] (GlobalFilterType type, float cutoff, float q, double sr = 48000.0)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            p.master = 30.0f;                                   // headroom for resonant peaks
+            p.elements[0].filterMode = FilterMode::bypass;      // white noise into the global filter
+            p.globalFilter = { type, cutoff, q };
+            e.setParams (p);
+            e.noteOn (60, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 5);
+            return c;
+        };
+
+        const double sr = 48000.0, f0 = 20.0 * std::pow (1000.0, 0.5);   // Cutoff 50 = about 632 Hz
+        const size_t from = 96000;
+        const auto none = spectrum (playGlobal (GlobalFilterType::bypass, 100.0f, 0.0f).l, sr, from);
+        const auto lp = spectrum (playGlobal (GlobalFilterType::lowpass, 50.0f, 0.0f).l, sr, from);
+        const auto hp = spectrum (playGlobal (GlobalFilterType::highpass, 50.0f, 0.0f).l, sr, from);
+        const auto bp = spectrum (playGlobal (GlobalFilterType::bandpass, 50.0f, 50.0f).l, sr, from);
+        const auto br = spectrum (playGlobal (GlobalFilterType::bandreject, 50.0f, 100.0f).l, sr, from);
+        const auto pk = spectrum (playGlobal (GlobalFilterType::peak, 50.0f, 50.0f).l, sr, from);
+
+        check (std::abs (db (none.mean (8000.0, 16000.0) / none.mean (200.0, 400.0))) < 3.0, "global Bypass leaves white noise flat");
+        check (db (lp.mean (100.0, 300.0) / lp.mean (8000.0, 16000.0)) > 40.0, "Lowpass passes lows and removes highs");
+        check (db (hp.mean (8000.0, 16000.0) / hp.mean (20.0, 60.0)) > 30.0, "Highpass passes highs and removes lows");
+        check (db (bp.mean (f0 * 0.97, f0 * 1.03) / bp.mean (8000.0, 16000.0)) > 20.0
+            && db (bp.mean (f0 * 0.97, f0 * 1.03) / bp.mean (40.0, 80.0)) > 12.0, "Bandpass peaks at the cutoff");
+        check (db (br.mean (700.0, 800.0) / br.mean (f0 * 0.998, f0 * 1.002)) > 12.0
+            && std::abs (db (br.mean (8000.0, 16000.0) / none.mean (8000.0, 16000.0))) < 1.5, "Bandreject cuts a notch and passes the rest");
+        check (db (pk.mean (f0 * 0.98, f0 * 1.02) / pk.mean (8000.0, 16000.0)) > 9.0
+            && std::abs (db (pk.mean (8000.0, 16000.0) / none.mean (8000.0, 16000.0))) < 1.5, "Peak boosts around the cutoff and leaves the rest");
+
+        // Higher Q gives a taller resonance at the cutoff.
+        const auto lpHigh = spectrum (playGlobal (GlobalFilterType::lowpass, 50.0f, 100.0f).l, sr, from);
+        check (db (lpHigh.peak (f0 * 0.8, f0 * 1.2) / lp.peak (f0 * 0.8, f0 * 1.2)) > 15.0, "Q raises a resonant peak at the cutoff");
+
+        // Lowering the cutoff moves the corner down.
+        const auto lpLower = spectrum (playGlobal (GlobalFilterType::lowpass, 25.0f, 0.0f).l, sr, from);
+        check (db (lpLower.mean (2000.0, 4000.0) / lp.mean (2000.0, 4000.0)) < -20.0, "lower Cutoff removes more of the highs");
+    }
+
+    // 23. Global filter stays finite and bounded at extreme settings, rates, and rapid changes.
+    {
+        bool ok = true;
+        for (double sr : { 22050.0, 44100.0, 48000.0, 96000.0, 192000.0 })
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            for (auto& el : p.elements) { el.enabled = true; el.width = 100.0f; }
+            e.setParams (p);
+            for (int note = 24; note < 108; note += 12) e.noteOn (note, 1.0f);
+
+            int type = 0;
+            for (int step = 0; step < 60 && ok; ++step)
+            {
+                p.globalFilter.type = static_cast<GlobalFilterType> (type++ % 6);
+                p.globalFilter.cutoff = (step % 3 == 0) ? 0.0f : (step % 3 == 1 ? 100.0f : 37.0f);
+                p.globalFilter.q = (step % 2 == 0) ? 100.0f : 0.0f;
+                e.setParams (p);
+                Capture c; renderBlocks (e, c, (int) (sr * 0.05));
+                ok = allFinite (c);
+            }
+        }
+        check (ok, "global filter finite and bounded across types, extremes, sample rates, rapid switching");
+    }
+
     std::printf ("\n%s\n", failures == 0 ? "All engine tests passed." : "Engine tests FAILED.");
     return failures == 0 ? 0 : 1;
 }

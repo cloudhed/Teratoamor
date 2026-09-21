@@ -55,6 +55,13 @@ private:
 
     juce::Label title;
     std::unique_ptr<SliderRow> master;
+
+    // Global filter strip: type, Q, and Cutoff on one line above the Elements.
+    juce::GroupComponent filterGroup;
+    juce::Label filterTypeLabel;
+    juce::ComboBox filterType;
+    std::unique_ptr<SliderRow> filterQ, filterCutoff;
+    std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
     std::array<ElementPanel, ParamIDs::numElements> panels;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TeratoamorAudioProcessorEditor)

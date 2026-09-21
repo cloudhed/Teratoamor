@@ -10,6 +10,11 @@ namespace ParamIDs
 
     inline const juce::String masterLevel { "master_level" };
 
+    // Global filter. Added in parameter version 6.
+    inline const juce::String filterType   { "gf_type" };
+    inline const juce::String filterCutoff { "gf_cutoff" };
+    inline const juce::String filterQ      { "gf_q" };
+
     // Per-Element IDs are "el<N>_<name>", where N is 1..3.
     inline juce::String element (int elementIndex, const char* name)
     {

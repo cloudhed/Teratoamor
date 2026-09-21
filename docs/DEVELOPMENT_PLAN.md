@@ -123,7 +123,9 @@ Deliver the smallest useful instrument before expanding the feature set.
 
 ### Milestone 3: global processing
 
-- [ ] Add the global multimode filter.
+- [x] Add the global multimode filter (`Source/DSP/GlobalFilter.h`; `gf_type`, `gf_cutoff`, `gf_q`, version hint 6). Type list from the user: Bypass, Lowpass, Highpass, Bandpass, Bandreject, Peak. Deliberately basic: a stereo 2-pole TPT state-variable filter after the summed Elements and before Master, Cutoff 20 Hz to 20 kHz (exponential), Q 0.71 to 25 (exponential), Peak is a +12 dB bell. The mappings are first estimates, not fitted to recordings; engine tests cover each type's shape, resonance, and stability. Optional later: a small recording batch to tune the Cutoff and Q curves and the Peak gain (`docs/GLOBAL_FILTER_RECORDING_PLAN.md`).
+- [ ] Add level compensation to the global filter's resonant level (high Q on Lowpass and Highpass currently gets louder). Deferred: decide by ear or from a recording whether to compensate, and by how much.
+- [ ] Polish the global filter's Bandreject: above about Q 40-50 the notch is too narrow to hear much change (user listening). Consider a gentler Q curve for Bandreject, or a wider notch at the top of the range.
 - [ ] Add distortion.
 - [ ] Add two delay lines.
 - [ ] Add tempo synchronisation where required.

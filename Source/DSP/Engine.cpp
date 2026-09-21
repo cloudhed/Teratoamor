@@ -20,6 +20,7 @@ void Engine::prepare (double newSampleRate)
     for (int v = 0; v < numVoices; ++v)
         voices[(size_t) v].prepare (sampleRate, v);
 
+    globalFilter.reset();
     noteCounter = 0;
     snapOnNextParams = true;
 }
@@ -32,6 +33,7 @@ void Engine::reset()
     releaseDeferred.fill (false);
     sustainDown = false;
     pitchBend.snap (0.0f);
+    globalFilter.reset();
     snapOnNextParams = true;
 }
 
@@ -56,6 +58,8 @@ void Engine::setParams (const EngineParams& newParams)
     }
 
     master.target = std::clamp (params.master, 0.0f, 100.0f) / 100.0f;
+    filterCutoff.target = std::clamp (params.globalFilter.cutoff, 0.0f, 100.0f) / 100.0f;
+    filterQ.target = std::clamp (params.globalFilter.q, 0.0f, 100.0f) / 100.0f;
 
     for (int e = 0; e < EngineParams::numElements; ++e)
     {
@@ -74,6 +78,8 @@ void Engine::setParams (const EngineParams& newParams)
     {
         master.snap (master.target);
         pitchBend.snap (pitchBend.target);
+        filterCutoff.snap (filterCutoff.target);
+        filterQ.snap (filterQ.target);
         for (auto& s : smoothers)
         {
             s.pitch.snap (s.pitch.target);
@@ -212,6 +218,12 @@ void Engine::render (float* left, float* right, int numSamples)
 
         for (auto& v : voices)
             v.render (left + start, right + start, n, frames);
+
+        // Global filter on the summed Elements, before the master level.
+        filterCutoff.advance (chunkCoefficient);
+        filterQ.advance (chunkCoefficient);
+        globalFilter.setParameters (params.globalFilter.type, filterCutoff.current, filterQ.current, sampleRate);
+        globalFilter.process (left + start, right + start, n);
 
         // Master level, then a hard safety clamp that also removes any NaN/infinity.
         for (int i = start; i < start + n; ++i)

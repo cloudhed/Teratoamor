@@ -65,6 +65,9 @@ private:
     };
 
     std::atomic<float>* masterLevelParam = nullptr;
+    std::atomic<float>* filterTypeParam = nullptr;
+    std::atomic<float>* filterCutoffParam = nullptr;
+    std::atomic<float>* filterQParam = nullptr;
     std::array<ElementParamPointers, ParamIDs::numElements> elementParams;
 
     Engine engine;
