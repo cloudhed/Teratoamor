@@ -33,6 +33,11 @@ The processor supersedes older inventory details below:
 - The current active coral is brighter peach-coral `#F5A399`, chosen visually
   from the supplied swatch. Warm toggle outlines retain `#D67A7B`. General borders
   use 1.6 logical pixels, accent outlines 2, and knob arcs 4–6.
+- Enabled knob arcs and slider handles, on-state switch lights, and selected
+  button outlines have a restrained coral halo. `Theme::glowSpread`,
+  `glowOpacity`, and `glowLayers` in `Source/ui/Theme.h` control its softness and
+  strength. Layered translucent strokes keep it procedural and scale with the
+  editor; the crisp control is drawn over the halo. Disabled controls omit it.
 - Parameter readouts retain processor units (including 0–100 control values).
   They do not claim those values are Hz, dB, seconds or Q factors. Envelope plots
   show a normalised shape with an illustrative sustain duration, not live voices.

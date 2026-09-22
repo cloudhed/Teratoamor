@@ -10,6 +10,9 @@ namespace Theme
     // Brighter peach-coral follows the supplied swatch; retain the warm toggle rim.
     inline const juce::Colour warmOutline { 0xffd67a7b };
     constexpr float borderWidth = 1.6f, accentBorderWidth = 2.0f;
+    // Logical pixels; the editor transform scales the halo along with the controls.
+    constexpr float glowSpread = 4.0f, glowOpacity = 0.055f;
+    constexpr int glowLayers = 8;
 }
 // Design coordinates: the editor scales this canvas as a whole. Panels lay out
 // their own controls from bounds, so these tokens can change independently.

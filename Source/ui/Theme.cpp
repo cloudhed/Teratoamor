@@ -3,6 +3,24 @@
 
 namespace teratoamor::ui
 {
+namespace
+{
+// Nested translucent strokes approximate a soft halo without offscreen images or
+// a per-repaint blur. Draw the crisp source shape afterwards. Shared tuning lives
+// in Theme so a stronger glow uses exactly the same drawing path.
+void drawGlow (juce::Graphics& g, const juce::Path& path, juce::Colour colour, float width)
+{
+    for (int layer = Theme::glowLayers; layer > 0; --layer)
+    {
+        const float extent = float (layer) / float (Theme::glowLayers);
+        g.setColour (colour.withAlpha (Theme::glowOpacity * (1.0f - 0.75f * extent)));
+        g.strokePath (path, juce::PathStrokeType (width + 2.0f * Theme::glowSpread * extent,
+                                                juce::PathStrokeType::curved,
+                                                juce::PathStrokeType::rounded));
+    }
+}
+}
+
 juce::Label* LookAndFeel::createSliderTextBox (juce::Slider& slider)
 {
     // Reuse JUCE's standard colours and typography, including editable-text colours.
@@ -53,6 +71,7 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int 
     const auto zero = slider.getMinimum() < 0 && slider.getMaximum() > 0
         ? start + float (slider.valueToProportionOfLength (0)) * (end - start) : start;
     active.addCentredArc (c.x, c.y, radius, radius, 0, juce::jmin (zero, angle), juce::jmax (zero, angle), true);
+    if (slider.isEnabled()) drawGlow (g, active, Theme::coral, stroke);
     g.setColour (slider.isEnabled() ? Theme::coral : Theme::mauve);
     g.strokePath (active, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     const auto body = juce::Rectangle<float> (radius * 1.76f, radius * 1.76f).withCentre (c);
@@ -79,7 +98,10 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int 
     g.setColour (Theme::border);
     if (vertical) g.fillRoundedRectangle (cx - 2, float (y), 4, float (h), 2);
     else g.fillRoundedRectangle (float (x), cy - 2, float (w), 4, 2);
-    g.setColour (Theme::coral);
+    juce::Path thumb;
+    thumb.addEllipse ((vertical ? cx : pos) - 4, (vertical ? pos : cy) - 4, 8, 8);
+    if (slider.isEnabled()) drawGlow (g, thumb, Theme::coral, 2.0f);
+    g.setColour (slider.isEnabled() ? Theme::coral : Theme::mauve);
     g.fillEllipse ((vertical ? cx : pos) - 5, (vertical ? pos : cy) - 5, 10, 10);
     if (slider.hasKeyboardFocus (true))
     {
@@ -90,9 +112,16 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int 
 
 void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool over, bool)
 {
-    auto r = b.getLocalBounds().toFloat().reduced (1);
+    // Reserve space inside the component clip for the selected outline's halo.
+    auto r = b.getLocalBounds().toFloat().reduced (Theme::glowSpread + 1.0f);
     g.setColour (b.getToggleState() ? Theme::deep : over ? Theme::panel.brighter (0.1f) : Theme::panel);
     g.fillRoundedRectangle (r, 9);
+    if (b.getToggleState() && b.isEnabled())
+    {
+        juce::Path outline;
+        outline.addRoundedRectangle (r, 9);
+        drawGlow (g, outline, Theme::coral, Theme::accentBorderWidth);
+    }
     g.setColour (b.hasKeyboardFocus (true) ? Theme::blush : b.getToggleState() ? Theme::coral : Theme::border);
     g.drawRoundedRectangle (r, 9, b.getToggleState() ? Theme::accentBorderWidth : Theme::borderWidth);
     if (b.getToggleState()) g.fillRoundedRectangle (r.getX() + 14, r.getBottom() - 5, r.getWidth() - 28, 3, 1);
@@ -103,6 +132,12 @@ void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bo
     const auto y = float (b.getHeight()) * 0.5f;
     g.setColour (b.getToggleState() ? Theme::warmOutline : Theme::border);
     g.drawRoundedRectangle (2, y - 9, 32, 18, 9, Theme::accentBorderWidth);
+    if (b.getToggleState() && b.isEnabled())
+    {
+        juce::Path light;
+        light.addEllipse (21.0f, y - 4, 8, 8);
+        drawGlow (g, light, Theme::coral, 2.0f);
+    }
     g.setColour (b.getToggleState() ? Theme::coral : Theme::mauve);
     g.fillEllipse (b.getToggleState() ? 20.0f : 6.0f, y - 5, 10, 10);
     g.setColour (over ? Theme::blush : Theme::text);
