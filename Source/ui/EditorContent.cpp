@@ -211,7 +211,7 @@ public:
         // Time scales decay/release only, matching the current engine.
         const auto scale = juce::jmax (0.1f, values[4] / 50.0f);
         const float a = juce::jmax (0.002f, values[0] * 0.1f);
-        const float d = juce::jmax (0.002f, values[1] * 0.104f * scale);
+        const float d = juce::jmax (0.002f, values[1] * 0.1f * scale);
         const float rel = juce::jmax (0.002f, values[3] * 0.1f * scale);
         const float sustain = values[2] / 100.0f;
         const float level = std::pow (sustain, 1.95f);

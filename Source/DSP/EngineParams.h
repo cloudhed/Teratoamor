@@ -49,7 +49,7 @@ struct ElementParams
     float width    = 90.0f;    // 0..100
     bool  link     = true;     // Elements 2 and 3 only: use Element 1's Attack, Decay, Sustain, Release, and Time
     float time     = 50.0f;    // 0..100: Decay and Release length. 50 = normal, 0 = nearly instant, 100 = twice as long
-    float decay    = 0.0f;     // 0..100 (about 0.104 seconds per unit)
+    float decay    = 0.0f;     // 0..100 (0.1 seconds per unit at Time 50)
     float sustain  = 100.0f;   // 0..100 (percent of full level)
     float attack   = 0.0f;     // 0..100 (control value; 10 units = 1 second)
     float release  = 5.0f;     // 0..100

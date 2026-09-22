@@ -496,7 +496,7 @@ int main()
 
     // 16. Decay and Sustain, fitted to 09_decay_* and 10_sustain_*: Attack -> Decay -> Sustain -> Release.
     // The amplitude follows u^1.95 where u falls linearly from 1 to the Sustain setting; Decay lasts
-    // 0.104 s per unit. A broad filter (Width 20) keeps the RMS readings steady.
+    // 0.1 s per unit (by design). A broad filter (Width 20) keeps the RMS readings steady.
     {
         const double sr = 48000.0;
         auto windowDb = [] (const Capture& c, double from, double to, double rate)
@@ -504,7 +504,7 @@ int main()
             return 20.0 * std::log10 (rms (c.l, (size_t) (from * rate), (size_t) (to * rate)) + 1.0e-12);
         };
 
-        // Sustain settles at the measured levels: 25 -> -22.6 dB, 50 -> -11.0 dB, 75 -> -4.3 dB (Decay 25 = 2.6 s).
+        // Sustain settles at the measured levels: 25 -> -22.6 dB, 50 -> -11.0 dB, 75 -> -4.3 dB (Decay 25 = 2.5 s).
         {
             const struct { float sustain; double referenceDb; } cases[] = { { 25.0f, -22.6 }, { 50.0f, -11.0 }, { 75.0f, -4.3 } };
             bool ok = true;
@@ -529,21 +529,21 @@ int main()
             check (ok, "Sustain settles at the reference levels (about Sustain^1.95 in amplitude)");
         }
 
-        // Decay 100 / Sustain 0 (default Time): 10.4 s long, about -11 dB at the halfway point, -22 dB at 75%.
+        // Decay 100 / Sustain 0 (default Time): 10 s long, about -11 dB at the halfway point, -22 dB at 75%.
         {
             Engine e; e.prepare (sr);
             auto p = defaultParams();
             p.elements[0].width = 20.0f; p.elements[0].decay = 100.0f; p.elements[0].sustain = 0.0f;
             e.setParams (p); e.noteOn (60, 1.0f);
             Capture c; renderBlocks (e, c, (int) sr * 12);
-            const double start = windowDb (c, 0.05, 0.5, sr), half = windowDb (c, 5.0, 5.4, sr), threeQuarter = windowDb (c, 7.6, 8.0, sr);
+            const double start = windowDb (c, 0.05, 0.5, sr), half = windowDb (c, 4.8, 5.2, sr), threeQuarter = windowDb (c, 7.3, 7.7, sr);
             double last = 0;
             for (int step = 0; step < 240; ++step)
                 if (rms (c.l, (size_t) (step * 0.05 * sr), (size_t) ((step + 1) * 0.05 * sr)) > 1.0e-6)
                     last = (step + 1) * 0.05;
-            std::printf ("       Decay 100: lasts %.2f s, halfway %.1f dB, 75%% %.1f dB (reference 10.4 s, -11, -22)\n",
+            std::printf ("       Decay 100: lasts %.2f s, halfway %.1f dB, 75%% %.1f dB (design 10 s, reference shape -11, -22)\n",
                          last, half - start, threeQuarter - start);
-            check (last > 10.2 && last < 10.7, "Decay 100 lasts about 10.4 s");
+            check (last > 9.8 && last < 10.3, "Decay 100 lasts about 10 s");
             check (std::abs ((half - start) + 11.0) < 2.0 && std::abs ((threeQuarter - start) + 22.0) < 2.5, "Decay follows the reference curve");
             check (rms (c.l, (size_t) (11 * sr), (size_t) (12 * sr)) == 0.0, "Sustain 0 decays to silence while the key is held");
             e.noteOff (60);
@@ -620,8 +620,8 @@ int main()
             return last;
         };
         const double f0 = fadeSeconds (0.0f), f50 = fadeSeconds (50.0f), f100 = fadeSeconds (100.0f);
-        std::printf ("       Decay 50 fades out in: Time 0 %.2f s, Time 50 %.2f s, Time 100 %.2f s (reference about 0.5 s, then 5.2 s and 10.4 s at Time 50 and Time 100 if scaled)\n", f0, f50, f100);
-        check (f0 > 0.4 && f0 < 0.65 && f50 > 5.0 && f50 < 5.5 && f100 > 10.2 && f100 < 10.9, "Time scales Decay");
+        std::printf ("       Decay 50 fades out in: Time 0 %.2f s, Time 50 %.2f s, Time 100 %.2f s (reference about 0.5 s, then 5 s and 10 s at Time 50 and Time 100 if scaled)\n", f0, f50, f100);
+        check (f0 > 0.4 && f0 < 0.65 && f50 > 4.8 && f50 < 5.3 && f100 > 9.8 && f100 < 10.5, "Time scales Decay");
     }
 
     // 18. Link: Elements 2 and 3 can follow Element 1's Attack, Decay, Sustain, Release, and Time.

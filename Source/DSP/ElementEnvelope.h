@@ -15,7 +15,7 @@ class ElementEnvelope
 {
 public:
     static constexpr float decayCurve = 1.95f;
-    static constexpr float decaySecondsPerUnit = 0.104f;   // measured: Decay 100 lasts 10.4 s at Time 50
+    static constexpr float decaySecondsPerUnit = 0.1f;   // by design: Decay 100 lasts 10 s at Time 50 (measured original: 10.4 s)
 
     void prepare (double newSampleRate) noexcept
     {
