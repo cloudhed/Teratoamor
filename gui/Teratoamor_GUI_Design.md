@@ -59,8 +59,12 @@ The reference canvas is 1600 × 1000; the initial window is 1440 × 900, with a
 1200 × 750 minimum and 2400 × 1500 maximum. JUCE handles display DPI separately.
 The UI uses the system sans-serif font and needs no new font or library licence.
 Only the logo is a bitmap; panel geometry and control positions are independent.
-Drag the window corner to resize. Knobs support Shift for fine movement, editable
-value text, keyboard adjustment and double-click to restore the parameter default.
+Drag the window corner to resize. Every numeric value supports up/down dragging,
+Shift-drag for fine adjustment, click-to-type and double-click to restore the
+parameter default. A single click waits for the double-click interval before
+opening text editing; Enter also opens editing when the value has keyboard focus.
+Number dragging follows the slider's range, steps and skew and sends automation
+begin/end gestures through the existing attachment. Knob and fader gestures remain available.
 Mouse-wheel parameter changes are disabled.
 
 `TeratoamorEditorTests` exercises all parameter attachments in both directions,

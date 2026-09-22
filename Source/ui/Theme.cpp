@@ -1,7 +1,22 @@
 #include "Theme.h"
+#include "DraggableValueLabel.h"
 
 namespace teratoamor::ui
 {
+juce::Label* LookAndFeel::createSliderTextBox (juce::Slider& slider)
+{
+    // Reuse JUCE's standard colours and typography, including editable-text colours.
+    std::unique_ptr<juce::Label> standard (juce::LookAndFeel_V4::createSliderTextBox (slider));
+    auto* label = new DraggableValueLabel (slider);
+    standard->copyAllExplicitColoursTo (*label);
+    label->setFont (standard->getFont());
+    label->setBorderSize (standard->getBorderSize());
+    label->setJustificationType (juce::Justification::centred);
+    label->setKeyboardType (juce::TextInputTarget::decimalKeyboard);
+    label->setTooltip ("Drag up/down to adjust. Shift-drag for fine adjustment. Click to type; double-click to reset.");
+    return label;
+}
+
 LookAndFeel::LookAndFeel()
 {
     setColour (juce::Label::textColourId, Theme::text);
@@ -56,6 +71,9 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int 
 void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
                                     float, float, juce::Slider::SliderStyle style, juce::Slider& slider)
 {
+    // A compact "numbers only" field (Octave/Semitone/Detune): still a draggable slider,
+    // but only JUCE's own text box is shown, no track or thumb graphic.
+    if (slider.getProperties().contains ("hideTrack")) return;
     const bool vertical = style == juce::Slider::LinearVertical;
     const float cx = float (x) + float (w) * 0.5f, cy = float (y) + float (h) * 0.5f;
     g.setColour (Theme::border);

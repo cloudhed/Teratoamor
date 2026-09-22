@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "ui/DraggableValueLabel.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 #include <set>
@@ -10,9 +11,9 @@ void require (bool condition, const juce::String& message)
 {
     if (! condition) throw std::runtime_error (message.toStdString());
 }
-void pump()
+void pump (int milliseconds = 90)
 {
-    const auto end = juce::Time::getMillisecondCounter() + 90;
+    const auto end = juce::Time::getMillisecondCounter() + juce::uint32 (milliseconds);
     do
     {
         MSG message;
@@ -55,6 +56,64 @@ bool visibleInSnapshot (const juce::Component& c)
         if (! ancestor->isVisible()) return false;
     return true;
 }
+
+void checkValueDragging (juce::Slider& slider)
+{
+    auto* label = find<teratoamor::ui::DraggableValueLabel> (slider, "draggableValue");
+    require (label != nullptr, "Missing draggable value: " + slider.getComponentID());
+    if (! slider.isEnabled()) return; // Linked Element envelopes are covered separately.
+    const double original = slider.getValue();
+    struct Gestures final : juce::Slider::Listener
+    {
+        void sliderValueChanged (juce::Slider*) override {}
+        void sliderDragStarted (juce::Slider*) override { ++starts; }
+        void sliderDragEnded (juce::Slider*) override { ++ends; }
+        int starts = 0, ends = 0;
+    } gestures;
+    slider.addListener (&gestures);
+    const auto event = [label] (float y, bool fine = false, int clicks = 1)
+    {
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), { 10, y },
+                                juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier
+                                    | (fine ? juce::ModifierKeys::shiftModifier : 0)),
+                                1, 0, 0, 0, 0, label, label, juce::Time::getCurrentTime(),
+                                { 10, 10 }, juce::Time::getCurrentTime(), clicks, y != 10);
+    };
+    slider.setValue (slider.proportionOfLengthToValue (0.5), juce::sendNotificationSync);
+    const auto middle = slider.getValue();
+    label->mouseDown (event (10));
+    label->mouseDrag (event (-30));
+    const auto coarse = slider.getValue();
+    label->mouseUp (event (-30));
+    require (coarse > middle, "Value did not increase on upward drag");
+    require (! label->isBeingEdited(), "Drag opened the text editor");
+    require (gestures.starts == 1 && gestures.ends == 1, "Drag gesture was not balanced");
+
+    slider.setValue (middle, juce::sendNotificationSync);
+    label->mouseDown (event (10, true));
+    label->mouseDrag (event (-30, true));
+    label->mouseUp (event (-30, true));
+    require (slider.getValue() >= middle && slider.getValue() < coarse, "Shift did not reduce sensitivity");
+
+    label->mouseDown (event (10));
+    label->mouseDrag (event (10000));
+    require (slider.getValue() == slider.getMinimum(), "Downward drag did not clamp to minimum");
+    label->mouseDrag (event (-10000));
+    label->mouseUp (event (-10000));
+    require (slider.getValue() == slider.getMaximum(), "Upward drag did not clamp to maximum");
+
+    // First click must wait, allowing a second click to reset rather than edit.
+    label->mouseDown (event (10)); label->mouseUp (event (10));
+    require (! label->isBeingEdited(), "Single click did not allow time for double-click");
+    label->mouseDown (event (10, false, 2));
+    label->mouseDoubleClick (event (10, false, 2));
+    label->mouseUp (event (10, false, 2));
+    require (std::abs (slider.getValue() - slider.getDoubleClickReturnValue()) < 0.001, "Double-click did not reset default");
+    require (gestures.starts == gestures.ends, "Unbalanced value-field gestures");
+    slider.removeListener (&gestures);
+    slider.setValue (original, juce::sendNotificationSync);
+}
+
 void save (juce::Component& c, const juce::File& directory, const juce::String& name)
 {
     pump(); checkBounds (c);
@@ -111,6 +170,28 @@ int main (int argc, char** argv)
             p->setValueNotifyingHost (before);
         }
         pump();
+        for (auto* base : processor.getParameters())
+            if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (base))
+                if (auto* slider = find<juce::Slider> (editor, p->paramID)) checkValueDragging (*slider);
+
+        // Real single-click editing and commit/cancel through JUCE's normal parser.
+        auto* panSlider = find<juce::Slider> (editor, ParamIDs::pan (0));
+        auto* panLabel = find<teratoamor::ui::DraggableValueLabel> (*panSlider, "draggableValue");
+        auto click = juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), { 10, 10 },
+                                      juce::ModifierKeys::leftButtonModifier, 1, 0, 0, 0, 0,
+                                      panLabel, panLabel, juce::Time::getCurrentTime(), { 10, 10 },
+                                      juce::Time::getCurrentTime(), 1, false);
+        panLabel->mouseDown (click); panLabel->mouseUp (click);
+        pump (juce::MouseEvent::getDoubleClickTimeout() + 80);
+        require (panLabel->isBeingEdited(), "Single click did not open text editing");
+        panLabel->getCurrentTextEditor()->setText ("-25.0");
+        panLabel->hideEditor (false);
+        require (panSlider->getValue() == -25.0, "Typed negative value did not commit");
+        require (processor.apvts.getRawParameterValue (ParamIDs::pan (0))->load() == -25.0f, "Typed value missed the parameter");
+        panLabel->showEditor(); panLabel->getCurrentTextEditor()->setText ("50"); panLabel->hideEditor (true);
+        require (panSlider->getValue() == -25.0, "Cancelled text edit changed the value");
+        panSlider->setValue (0, juce::sendNotificationSync);
+
         require (! find<juce::Slider> (editor, ParamIDs::attack (1))->isEnabled(), "Linked envelope must be disabled");
         processor.apvts.getParameter (ParamIDs::link (1))->setValueNotifyingHost (0); pump();
         require (find<juce::Slider> (editor, ParamIDs::attack (1))->isEnabled(), "Unlinked envelope must be enabled");
@@ -121,6 +202,7 @@ int main (int argc, char** argv)
         for (const int width : { 1200, 1440, 2400 })
         {
             editor.setSize (width, width * 5 / 8);
+            save (editor, output, "elements-" + juce::String (width));
             for (auto* name : { "GLOBAL", "MODULATION (ENV)", "MODULATION (OSC)", "SPACE" })
             {
                 find<juce::TextButton> (editor, name)->onClick();

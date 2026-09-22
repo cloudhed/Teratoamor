@@ -22,6 +22,13 @@ namespace Layout
     constexpr float radius = 22.0f;
     constexpr float pitchFraction = 0.23f, widthFraction = 0.43f, envelopeFraction = 0.60f;
     constexpr float soundHeightFraction = 0.60f;
+    constexpr float modeFraction = 0.42f;   // Element panel: filter mode dropdown's share of the top row
+    // Element composition in design coordinates; keep the preview square-ish and
+    // control sizes independent instead of stretching them to fill spare space.
+    constexpr int elementWidthKnobWidth = 120, elementWidthKnobHeight = 164;
+    constexpr int elementShapeWidth = 84, elementShapeHeight = 110, elementShapeGap = 24;
+    constexpr int elementEnvelopeHeight = 180, elementGraphWidth = 78, elementGraphHeight = 80;
+    constexpr int elementOutputWidth = 86, elementOutputHeight = 120, elementOutputGap = 8;
     constexpr int workspaceTabWidth = 220, modDepthWidth = 90, modGraphWidth = 100;
     constexpr float modSelectorsFraction = 0.52f, delayMixFraction = 0.23f, reverbFraction = 0.32f;
 }
@@ -29,6 +36,7 @@ class LookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
     LookAndFeel();
+    juce::Label* createSliderTextBox (juce::Slider&) override;
     void drawRotarySlider (juce::Graphics&, int, int, int, int, float, float, float, juce::Slider&) override;
     void drawLinearSlider (juce::Graphics&, int, int, int, int, float, float, float,
                            juce::Slider::SliderStyle, juce::Slider&) override;

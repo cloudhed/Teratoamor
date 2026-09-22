@@ -47,6 +47,17 @@ public:
         addAndMakeVisible (slider);
         attachment = std::make_unique<State::SliderAttachment> (state, id, slider);
         slider.setDoubleClickReturnValue (true, p->convertFrom0to1 (p->getDefaultValue()));
+
+        // Envelope times get a slider-only skew so short times have more travel. The
+        // parameter (host automation, saved state) stays linear. Set after the
+        // attachment, which copies the parameter's own range onto the slider.
+        const bool envelopeTime = ! id.startsWith ("delay")
+                                  && (id.endsWith ("_attack") || id.endsWith ("_decay") || id.endsWith ("_release"));
+        if (envelopeTime)
+        {
+            slider.setSkewFactorFromMidPoint (5.0);
+            slider.setSliderSnapsToMousePosition (false); // dragging starts from the current value, no jump on click
+        }
     }
     void resized() override
     {
@@ -59,6 +70,50 @@ public:
         slider.setEnabled (enabled);
         setAlpha (enabled ? 1.0f : 0.55f);
         if (reason.isNotEmpty()) slider.setTooltip (slider.getName() + ". " + reason);
+    }
+    juce::Slider slider;
+private:
+    juce::Label label;
+    std::unique_ptr<State::SliderAttachment> attachment;
+};
+
+// A number-only control (Octave, Semitone, Detune): a draggable value with a small
+// caption, no rotary or track graphic, for rows too short for a full knob.
+class CompactNumber final : public juce::Component
+{
+public:
+    CompactNumber (State& state, const juce::String& id, const juce::String& name)
+    {
+        auto* p = state.getParameter (id);
+        jassert (p != nullptr);
+        setComponentID (id);
+        label.setText (name, juce::dontSendNotification);
+        label.setJustificationType (juce::Justification::centred);
+        label.setFont (juce::FontOptions (11));
+        label.setColour (juce::Label::textColourId, Theme::mauve);
+        slider.setName (p->getName (100));
+        slider.setComponentID (id);
+        slider.setTooltip (p->getName (100) + ". Drag to change; shift-drag for fine adjustment; double-click to reset.");
+        slider.setSliderStyle (juce::Slider::LinearVertical);
+        slider.getProperties().set ("hideTrack", true);
+        slider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 74, 20);
+        slider.setColour (juce::Slider::textBoxTextColourId, Theme::text);
+        slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
+        slider.setScrollWheelEnabled (false);
+        slider.setVelocityModeParameters (0.25, 1, 0.0, true, juce::ModifierKeys::shiftModifier);
+        slider.setWantsKeyboardFocus (true);
+        addAndMakeVisible (slider);
+        addAndMakeVisible (label);
+        attachment = std::make_unique<State::SliderAttachment> (state, id, slider);
+        slider.setDoubleClickReturnValue (true, p->convertFrom0to1 (p->getDefaultValue()));
+    }
+    void resized() override
+    {
+        // Caption on top, value below: matches the Filter Mode dropdown this shares a row with.
+        auto r = getLocalBounds();
+        label.setBounds (r.removeFromTop (16));
+        slider.setBounds (r);
     }
     juce::Slider slider;
 private:
@@ -210,12 +265,16 @@ public:
         on (s, ParamIDs::enabled (e), "On"), mode (s, ParamIDs::filter (e), "FILTER MODE"), graph (s, e)
     {
         addAndMakeVisible (on); addAndMakeVisible (mode); addAndMakeVisible (graph);
+        octave = std::make_unique<CompactNumber> (s, ParamIDs::element (e, "octave"), "OCT");
+        semitone = std::make_unique<CompactNumber> (s, ParamIDs::element (e, "semitone"), "SEMI");
+        detune = std::make_unique<CompactNumber> (s, ParamIDs::element (e, "fine"), "DETUNE");
+        for (auto* c : { octave.get(), semitone.get(), detune.get() }) addAndMakeVisible (*c);
         // Control order is local to this reusable panel, independent of host parameter order.
-        const char* ids[] { "octave", "semitone", "width", "fine", "warp", "clip", "pan", "level" };
-        const char* labels[] { "OCTAVE", "SEMITONE", "WIDTH", "DETUNE (ct)", "WARP", "CLIP", "PAN", "LEVEL" };
-        for (int i = 0; i < 8; ++i)
+        const char* ids[] { "width", "warp", "clip", "pan", "level" };
+        const char* labels[] { "WIDTH", "WARP", "CLIP", "PAN", "LEVEL" };
+        for (int i = 0; i < 5; ++i)
         {
-            if (i == 5 && e == 1) continue;
+            if (i == 2 && e == 1) continue; // Element 2 has no Clip parameter
             tone[size_t (i)] = std::make_unique<ParameterControl> (s, ParamIDs::element (e, ids[i]), labels[i]);
             addAndMakeVisible (*tone[size_t (i)]);
         }
@@ -240,26 +299,41 @@ public:
         on.setBounds (getWidth() - 94, 15, 74, 28);
         if (link) link->setBounds (getWidth() - 258, 15, 150, 28);
         auto r = body();
-        mode.setBounds (r.removeFromTop (54));
-        r.removeFromTop (12);
-        auto sound = r.removeFromTop (juce::roundToInt (r.getHeight() * Layout::soundHeightFraction));
-        auto pitch = sound.removeFromLeft (juce::roundToInt (sound.getWidth() * Layout::pitchFraction));
-        tone[0]->setBounds (pitch.removeFromTop (pitch.getHeight() / 2));
-        tone[1]->setBounds (pitch);
-        auto width = sound.removeFromLeft (juce::roundToInt (r.getWidth() * Layout::widthFraction));
-        tone[2]->setBounds (width.reduced (4, 0));
-        tone[3]->setBounds (sound.removeFromTop (sound.getHeight() / 2));
-        if (tone[5])
-        {
-            tone[4]->setBounds (sound.removeFromLeft (sound.getWidth() / 2));
-            tone[5]->setBounds (sound);
-        }
-        else tone[4]->setBounds (sound);
-        r.removeFromTop (8);
-        auto output = r.removeFromRight (juce::roundToInt (r.getWidth() * (1 - Layout::envelopeFraction)));
-        tone[6]->setBounds (output.removeFromLeft (output.getWidth() / 2).reduced (0, 14));
-        tone[7]->setBounds (output.reduced (0, 14));
-        graph.setBounds (r.removeFromBottom (44).reduced (3, 1));
+
+        // Row 1: the filter mode dropdown, shrunk, with Octave/Semitone/Detune as compact
+        // draggable numbers sharing its row.
+        auto row1 = r.removeFromTop (54);
+        mode.setBounds (row1.removeFromLeft (juce::roundToInt (row1.getWidth() * Layout::modeFraction)));
+        row1.removeFromLeft (10);
+        const int pitchCell = row1.getWidth() / 3;
+        octave->setBounds (row1.removeFromLeft (pitchCell).reduced (4, 0));
+        semitone->setBounds (row1.removeFromLeft (pitchCell).reduced (4, 0));
+        detune->setBounds (row1.reduced (4, 0));
+        r.removeFromTop (18);
+
+        // Large Width on the left, with smaller, top-aligned Warp/Clip beside it.
+        auto sound = r.withHeight (Layout::elementWidthKnobHeight);
+        tone[0]->setBounds (sound.removeFromLeft (Layout::elementWidthKnobWidth));
+        sound.removeFromLeft (Layout::elementShapeGap);
+        tone[1]->setBounds (sound.removeFromLeft (Layout::elementShapeWidth).withHeight (Layout::elementShapeHeight));
+        sound.removeFromLeft (4);
+        if (tone[2]) tone[2]->setBounds (sound.removeFromLeft (Layout::elementShapeWidth).withHeight (Layout::elementShapeHeight));
+
+        // The output column begins above the envelope row, as in the mockup.
+        auto sideColumn = r.removeFromRight (Layout::elementOutputWidth);
+        sideColumn = sideColumn.removeFromBottom (2 * Layout::elementOutputHeight + Layout::elementOutputGap);
+        tone[3]->setBounds (sideColumn.removeFromTop (Layout::elementOutputHeight));
+        sideColumn.removeFromTop (Layout::elementOutputGap);
+        tone[4]->setBounds (sideColumn);
+        r.removeFromRight (10);
+
+        // Fixed-height faders and a small preview, with its bottom aligned to the
+        // slider tracks (above their values/labels), rather than a stretched plot.
+        r = r.removeFromBottom (Layout::elementEnvelopeHeight);
+        auto graphArea = r.removeFromRight (Layout::elementGraphWidth + 6).reduced (3, 0);
+        graphArea.removeFromBottom (44);
+        graph.setBounds (graphArea.removeFromBottom (Layout::elementGraphHeight));
+        r.removeFromRight (10);
         const int cell = r.getWidth() / 5;
         for (auto& control : envelope) control->setBounds (r.removeFromLeft (cell));
     }
@@ -277,7 +351,8 @@ private:
     Choice mode;
     EnvelopeDisplay graph;
     std::unique_ptr<Toggle> link;
-    std::array<std::unique_ptr<ParameterControl>, 8> tone;
+    std::unique_ptr<CompactNumber> octave, semitone, detune;
+    std::array<std::unique_ptr<ParameterControl>, 5> tone;   // width, warp, clip (optional), pan, level
     std::array<std::unique_ptr<ParameterControl>, 5> envelope;
 };
 
@@ -664,8 +739,10 @@ struct EditorContent::Impl
 
 EditorContent::EditorContent (TeratoamorAudioProcessor& p)
 {
-    setLookAndFeel (&lookAndFeel);
     impl = std::make_unique<Impl> (*this, p);
+    // Apply after constructing the children so JUCE rebuilds every value label
+    // with our shared draggable implementation, including initially hidden tabs.
+    setLookAndFeel (&lookAndFeel);
     setSize (Layout::width, Layout::height);
 }
 EditorContent::~EditorContent()
