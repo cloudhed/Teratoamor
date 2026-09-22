@@ -8,12 +8,14 @@ namespace
 // Nested translucent strokes approximate a soft halo without offscreen images or
 // a per-repaint blur. Draw the crisp source shape afterwards. Shared tuning lives
 // in Theme so a stronger glow uses exactly the same drawing path.
-void drawGlow (juce::Graphics& g, const juce::Path& path, juce::Colour colour, float width)
+void drawGlow (juce::Graphics& g, const juce::Path& path, float width)
 {
     for (int layer = Theme::glowLayers; layer > 0; --layer)
     {
         const float extent = float (layer) / float (Theme::glowLayers);
-        g.setColour (colour.withAlpha (Theme::glowOpacity * (1.0f - 0.75f * extent)));
+        // Vary only the hue; preserve the existing per-layer alpha and spread.
+        g.setColour (Theme::glowColours[Theme::glowLayers - layer].withAlpha (
+            Theme::glowOpacity * (1.0f - 0.75f * extent)));
         g.strokePath (path, juce::PathStrokeType (width + 2.0f * Theme::glowSpread * extent,
                                                 juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
@@ -59,31 +61,37 @@ LookAndFeel::LookAndFeel()
 void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float position,
                                     float start, float end, juce::Slider& slider)
 {
-    const auto r = juce::Rectangle<float> (float (x), float (y), float (w), float (h)).reduced (7);
+    const auto r = juce::Rectangle<float> (float (x), float (y), float (w), float (h)).reduced (9);
     const float radius = juce::jmin (r.getWidth(), r.getHeight()) * 0.5f;
     const auto c = r.getCentre();
     const auto angle = start + position * (end - start);
     const float stroke = radius > 65 ? 6.0f : 4.0f;
+    // Recessed black ring gives the illuminated arc contrast, like the reference.
+    const auto well = juce::Rectangle<float> ((radius + stroke * 0.5f) * 2,
+                                             (radius + stroke * 0.5f) * 2).withCentre (c);
+    g.setGradientFill (juce::ColourGradient (Theme::background.darker (0.4f), well.getTopLeft(),
+                                           Theme::knobTop, well.getBottomRight(), false));
+    g.fillEllipse (well);
     juce::Path track, active;
     track.addCentredArc (c.x, c.y, radius, radius, 0, start, end, true);
-    g.setColour (Theme::border.withAlpha (0.65f));
+    g.setColour (Theme::background);
     g.strokePath (track, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     const auto zero = slider.getMinimum() < 0 && slider.getMaximum() > 0
         ? start + float (slider.valueToProportionOfLength (0)) * (end - start) : start;
     active.addCentredArc (c.x, c.y, radius, radius, 0, juce::jmin (zero, angle), juce::jmax (zero, angle), true);
-    if (slider.isEnabled()) drawGlow (g, active, Theme::coral, stroke);
-    g.setColour (slider.isEnabled() ? Theme::coral : Theme::mauve);
+    if (slider.isEnabled()) drawGlow (g, active, stroke);
+    g.setColour (slider.isEnabled() ? Theme::lightCore : Theme::mauve);
     g.strokePath (active, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     const auto body = juce::Rectangle<float> (radius * 1.76f, radius * 1.76f).withCentre (c);
-    g.setGradientFill (juce::ColourGradient (Theme::deep.brighter (0.05f), body.getTopLeft(),
-                                           Theme::background, body.getBottomRight(), false));
+    g.setGradientFill (juce::ColourGradient (Theme::knobTop, body.getTopLeft(),
+                                           Theme::knobBottom, body.getBottomRight(), false));
     g.fillEllipse (body);
     g.setColour (slider.hasKeyboardFocus (true) ? Theme::blush :
-                 slider.isMouseOverOrDragging() ? Theme::mauve : Theme::border);
-    g.drawEllipse (body, Theme::borderWidth);
+                 slider.isMouseOverOrDragging() ? Theme::mauve : Theme::violet.withAlpha (0.3f));
+    g.drawEllipse (body, 1.0f);
     const auto from = c.getPointOnCircumference (radius * 0.58f, angle);
     const auto to = c.getPointOnCircumference (radius * 0.78f, angle);
-    g.setColour (Theme::text);
+    g.setColour (Theme::lightCore.interpolatedWith (Theme::text, 0.5f));
     g.drawLine ({ from, to }, 2.0f);
 }
 
@@ -100,7 +108,7 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int 
     else g.fillRoundedRectangle (float (x), cy - 2, float (w), 4, 2);
     juce::Path thumb;
     thumb.addEllipse ((vertical ? cx : pos) - 4, (vertical ? pos : cy) - 4, 8, 8);
-    if (slider.isEnabled()) drawGlow (g, thumb, Theme::coral, 2.0f);
+    if (slider.isEnabled()) drawGlow (g, thumb, 2.0f);
     g.setColour (slider.isEnabled() ? Theme::coral : Theme::mauve);
     g.fillEllipse ((vertical ? cx : pos) - 5, (vertical ? pos : cy) - 5, 10, 10);
     if (slider.hasKeyboardFocus (true))
@@ -114,32 +122,37 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, cons
 {
     // Reserve space inside the component clip for the selected outline's halo.
     auto r = b.getLocalBounds().toFloat().reduced (Theme::glowSpread + 1.0f);
-    g.setColour (b.getToggleState() ? Theme::deep : over ? Theme::panel.brighter (0.1f) : Theme::panel);
+    g.setColour (over ? Theme::panel.brighter (0.1f) : Theme::panel);
     g.fillRoundedRectangle (r, 9);
     if (b.getToggleState() && b.isEnabled())
     {
         juce::Path outline;
         outline.addRoundedRectangle (r, 9);
-        drawGlow (g, outline, Theme::coral, Theme::accentBorderWidth);
+        drawGlow (g, outline, Theme::accentBorderWidth);
     }
     g.setColour (b.hasKeyboardFocus (true) ? Theme::blush : b.getToggleState() ? Theme::coral : Theme::border);
     g.drawRoundedRectangle (r, 9, b.getToggleState() ? Theme::accentBorderWidth : Theme::borderWidth);
-    if (b.getToggleState()) g.fillRoundedRectangle (r.getX() + 14, r.getBottom() - 5, r.getWidth() - 28, 3, 1);
 }
 
 void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool over, bool)
 {
     const auto y = float (b.getHeight()) * 0.5f;
-    g.setColour (b.getToggleState() ? Theme::warmOutline : Theme::border);
-    g.drawRoundedRectangle (2, y - 9, 32, 18, 9, Theme::accentBorderWidth);
+    g.setColour (Theme::background);
+    g.fillRoundedRectangle (2, y - 9, 32, 18, 9);
+    g.setColour (Theme::border.withAlpha (0.6f));
+    g.drawRoundedRectangle (2, y - 9, 32, 18, 9, 1.0f);
     if (b.getToggleState() && b.isEnabled())
     {
         juce::Path light;
-        light.addEllipse (21.0f, y - 4, 8, 8);
-        drawGlow (g, light, Theme::coral, 2.0f);
+        light.addEllipse (20.0f, y - 5, 10, 10);
+        drawGlow (g, light, 2.0f);
     }
-    g.setColour (b.getToggleState() ? Theme::coral : Theme::mauve);
-    g.fillEllipse (b.getToggleState() ? 20.0f : 6.0f, y - 5, 10, 10);
+    const float dotX = b.getToggleState() ? 19.0f : 5.0f;
+    g.setGradientFill (juce::ColourGradient (b.getToggleState() ? Theme::lightCore : Theme::mauve,
+                                           dotX + 6, y - 6,
+                                           b.getToggleState() ? Theme::coral : Theme::violet,
+                                           dotX + 6, y + 6, false));
+    g.fillEllipse (dotX, y - 6, 12, 12);
     g.setColour (over ? Theme::blush : Theme::text);
     g.setFont (juce::FontOptions (13));
     g.drawText (b.getButtonText(), 42, 0, b.getWidth() - 44, b.getHeight(), juce::Justification::centredLeft);

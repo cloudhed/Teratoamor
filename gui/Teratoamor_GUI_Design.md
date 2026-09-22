@@ -34,10 +34,18 @@ The processor supersedes older inventory details below:
   from the supplied swatch. Warm toggle outlines retain `#D67A7B`. General borders
   use 1.6 logical pixels, accent outlines 2, and knob arcs 4–6.
 - Enabled knob arcs and slider handles, on-state switch lights, and selected
-  button outlines have a restrained coral halo. `Theme::glowSpread`,
+  button outlines have a warm orange halo around coral lights. `Theme::glowColours`, `Theme::glowSpread`,
   `glowOpacity`, and `glowLayers` in `Source/ui/Theme.h` control its softness and
   strength. Layered translucent strokes keep it procedural and scale with the
   editor; the crisp control is drawn over the halo. Disabled controls omit it.
+  The two outer layers use `#FF965B`; the six inner layers step through
+  `#FF915B`, `#FF8D5B`, `#FF885B`, `#FF835B`, `#FF7F5B`, and `#FF7A5B`,
+  retaining the same fading alpha on every layer.
+- Mockup tuning uses pale peach arc cores, the first glow pass's opacity and
+  linear falloff with a wider 6-pixel spread (originally 4),
+  recessed dark knob rings, shaded charcoal knob faces with subtle rims, and
+  peach switch lights in dark wells. Selected buttons use a luminous outline
+  without an underline. This is procedural styling, not a pixel-exact replica.
 - Parameter readouts retain processor units (including 0–100 control values).
   They do not claim those values are Hz, dB, seconds or Q factors. Envelope plots
   show a normalised shape with an illustrative sustain duration, not live voices.

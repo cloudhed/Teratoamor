@@ -9,9 +9,17 @@ namespace Theme
     inline const juce::Colour blush { 0xffe4a9a9 }, coral { 0xfff5a399 }, text { 0xffede3eb };
     // Brighter peach-coral follows the supplied swatch; retain the warm toggle rim.
     inline const juce::Colour warmOutline { 0xffd67a7b };
+    inline const juce::Colour lightCore { 0xffffc6b9 }, knobTop { 0xff302936 }, knobBottom { 0xff131219 };
+    // Outside to inside: two orange layers, then six steps towards red-orange.
+    inline const juce::Colour glowColours[] {
+        juce::Colour { 0xffff965b }, juce::Colour { 0xffff965b },
+        juce::Colour { 0xffff915b }, juce::Colour { 0xffff8d5b },
+        juce::Colour { 0xffff885b }, juce::Colour { 0xffff835b },
+        juce::Colour { 0xffff7f5b }, juce::Colour { 0xffff7a5b }
+    };
     constexpr float borderWidth = 1.6f, accentBorderWidth = 2.0f;
     // Logical pixels; the editor transform scales the halo along with the controls.
-    constexpr float glowSpread = 4.0f, glowOpacity = 0.055f;
+    constexpr float glowSpread = 6.0f, glowOpacity = 0.055f;
     constexpr int glowLayers = 8;
 }
 // Design coordinates: the editor scales this canvas as a whole. Panels lay out
