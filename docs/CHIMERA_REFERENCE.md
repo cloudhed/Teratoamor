@@ -105,6 +105,15 @@ The implementation must clamp the denominator or maximum Q safely near Width 100
 
 ## Filter observations
 
+User listening comparison (2026-09-24), with Q 0: Chimera Lowpass Cutoff 2, 5,
+and 10 sound approximately like the earlier Teratoamor Lowpass Cutoff 29, 39,
+and 50 respectively (the last estimate might be 40). Chimera Highpass Cutoff
+100 sounds like the earlier Teratoamor Highpass Cutoff 86. Chimera Lowpass at
+0 is effectively silent. These are subjective matches, not measured corner
+frequencies. Teratoamor now uses a Lowpass knob power curve with exponent
+0.315, which predicts old positions 29, 39, and 48 at 2, 5, and 10; Highpass
+scales the knob position by 0.86. Other modes and Q await comparison.
+
 - `Bypass` produces essentially unfiltered white noise.
 - `BP Narrow` is extremely tonal.
 - `Peak Narrow` is dominated heavily by the fundamental.

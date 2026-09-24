@@ -157,9 +157,15 @@ int main (int argc, char** argv)
             }
             if (choice)
             {
-                require (choice->getSelectedItemIndex() == juce::roundToInt (p->convertFrom0to1 (p->getValue())), "Choice automation failed");
+                const bool modTarget = p->paramID.startsWith ("mod") && p->paramID.endsWith ("_target");
+                const int parameterIndex = juce::roundToInt (p->convertFrom0to1 (p->getValue()));
+                require (modTarget ? choice->getSelectedId() == parameterIndex + 1
+                                   : choice->getSelectedItemIndex() == parameterIndex,
+                         "Choice automation failed: " + p->paramID);
                 choice->setSelectedItemIndex (choice->getNumItems() - 1, juce::sendNotificationSync);
-                require (juce::roundToInt (p->convertFrom0to1 (p->getValue())) == choice->getSelectedItemIndex(), "Choice edit failed");
+                require (juce::roundToInt (p->convertFrom0to1 (p->getValue()))
+                             == (modTarget ? choice->getSelectedId() - 1 : choice->getSelectedItemIndex()),
+                         "Choice edit failed: " + p->paramID);
             }
             if (toggle)
             {
@@ -170,6 +176,37 @@ int main (int argc, char** argv)
             p->setValueNotifyingHost (before);
         }
         pump();
+        for (int section = 0; section < ParamIDs::numMods; ++section)
+        {
+            auto* target = find<juce::ComboBox> (editor, ParamIDs::mod (section, "target"));
+            require (target->getItemText (0) == "Element1 Volume"
+                     && target->getItemText (6) == "Element2 Volume"
+                     && target->getItemText (11) == "Element3 Volume",
+                     "Element Volume does not lead each target group");
+        }
+        auto* tempoSlider = find<juce::Slider> (editor, ParamIDs::tempoBpm);
+        auto* masterSlider = find<juce::Slider> (editor, ParamIDs::masterLevel);
+        auto* hostSync = find<juce::ToggleButton> (editor, ParamIDs::tempoSync);
+        require (masterSlider->getTextFromValue (50.0) == juce::String::fromUTF8 (u8"\u22126.0")
+                 && masterSlider->getTextFromValue (100.0) == "0.0"
+                 && masterSlider->getTextFromValue (0.0) == juce::String::fromUTF8 (u8"\u2212\u221e"),
+                 "Master readout does not match the linear output gain");
+        const auto asciiGain = masterSlider->getValueFromText ("-6.0");
+        const auto unicodeInput = juce::String::fromUTF8 (u8"\u22126.0");
+        const auto unicodeGain = masterSlider->getValueFromText (unicodeInput);
+        require (std::abs (asciiGain - 50.12) < 0.1 && std::abs (unicodeGain - 50.12) < 0.1,
+                 "Typed master dB did not convert back to gain: ASCII " + juce::String (asciiGain)
+                     + ", Unicode " + juce::String (unicodeGain));
+        require (hostSync->getToggleState() && ! tempoSlider->isEnabled(),
+                 "Host sync should disable manual tempo dragging");
+        hostSync->setToggleState (false, juce::sendNotificationSync); pump();
+        require (tempoSlider->isEnabled(), "Manual tempo did not become editable");
+        const auto originalMaster = masterSlider->getValue();
+        masterSlider->setValue (50.0, juce::sendNotificationSync);
+        save (editor, output, "header-manual-minus-six");
+        masterSlider->setValue (originalMaster, juce::sendNotificationSync);
+        hostSync->setToggleState (true, juce::sendNotificationSync); pump();
+        require (! tempoSlider->isEnabled(), "Host tempo knob remained editable");
         for (auto* base : processor.getParameters())
             if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (base))
                 if (auto* slider = find<juce::Slider> (editor, p->paramID)) checkValueDragging (*slider);
@@ -214,6 +251,13 @@ int main (int argc, char** argv)
                     const bool osc = juce::String (name) == "MODULATION (OSC)";
                     auto* depth = find<juce::Slider> (editor, ParamIDs::mod (m, "depth"));
                     require (visibleInSnapshot (*depth) == (m < 3 ? env : osc), "Wrong modulation group visibility");
+                    if (osc && m >= 3)
+                    {
+                        const auto targetWidth = find<juce::ComboBox> (editor, ParamIDs::mod (m, "target"))->getWidth();
+                        require (targetWidth == find<juce::ComboBox> (editor, ParamIDs::mod (m, "wave"))->getWidth()
+                                 && targetWidth == find<juce::ComboBox> (editor, ParamIDs::mod (m, "rate"))->getWidth(),
+                                 "Destination dropdown is wider than Wave and Rate");
+                    }
                     if (m < 3)
                         for (auto* stage : { "attack", "decay", "sustain", "release", "time" })
                             require (find<juce::Slider> (editor, ParamIDs::mod (m, stage))->getSliderStyle()
@@ -236,23 +280,69 @@ int main (int argc, char** argv)
         require (initialState == afterTabs, "Navigation changed plugin state");
         // A sounding block must drive the processor's existing output meter feed.
         processor.prepareToPlay (48000, 512);
+        struct FixedPlayHead final : juce::AudioPlayHead
+        {
+            juce::Optional<PositionInfo> getPosition() const override
+            {
+                PositionInfo position;
+                position.setBpm (137.0);
+                return position;
+            }
+        } hostPlayHead;
+        processor.setPlayHead (&hostPlayHead);
         juce::AudioBuffer<float> buffer (2, 512);
         juce::MidiBuffer midi;
         midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+        const auto activityBeforeNote = processor.midiActivityCounter.load();
         processor.processBlock (buffer, midi);
         require (processor.outputPeakLeft.load() > 0, "No output meter signal");
+        require (processor.activeVoices.load() > 0, "No active MIDI voice count");
+        require (processor.midiActivityCounter.load() == activityBeforeNote + 1, "MIDI activity light missed a note");
+        require (processor.getCurrentBpm() == 137.0, "Host tempo was not published to the editor");
+        std::array<float, TeratoamorAudioProcessor::spectrumSize> spectrumSamples {};
+        processor.copySpectrumSamples (spectrumSamples);
+        require (std::any_of (spectrumSamples.begin(), spectrumSamples.end(), [] (float value) { return std::abs (value) > 0.0f; }),
+                 "No output spectrum signal");
         const float peak = processor.outputPeakLeft.load();
         midi.addEvent (juce::MidiMessage::allSoundOff (1), 0);
         for (int i = 0; i < 10; ++i) processor.processBlock (buffer, midi);
+        require (processor.midiActivityCounter.load() == activityBeforeNote + 2, "MIDI activity light missed a command");
         require (processor.outputPeakLeft.load() >= peak, "Meter lost a transient before the GUI consumed it");
         find<juce::TextButton> (editor, "GLOBAL")->onClick();
         save (editor, output, "global-playing");
         require (processor.outputPeakLeft.load() == 0, "Meter did not consume its peak");
+        pump (120);
+        require (find<teratoamor::ui::DraggableValueLabel> (*tempoSlider, "draggableValue")->getText() == "137",
+                 "Synced BPM readout did not follow the host");
+        auto* bpmParameter = processor.apvts.getParameter (ParamIDs::tempoBpm);
+        bpmParameter->setValueNotifyingHost (bpmParameter->convertTo0to1 (150.0f));
+        hostSync->setToggleState (false, juce::sendNotificationSync);
+        processor.processBlock (buffer, midi); pump (120);
+        require (processor.getCurrentBpm() == 150.0 && tempoSlider->isEnabled()
+                 && find<teratoamor::ui::DraggableValueLabel> (*tempoSlider, "draggableValue")->getText() == "150",
+                 "Manual BPM did not replace the host tempo");
+        hostSync->setToggleState (true, juce::sendNotificationSync);
+        processor.setPlayHead (nullptr);
+        processor.processBlock (buffer, midi); pump (120);
+        require (processor.getCurrentBpm() == 150.0 && ! tempoSlider->isEnabled(),
+                 "Saved manual BPM was not used when the host tempo disappeared");
         processor.releaseResources();
         processor.apvts.getParameter (ParamIDs::width (0))->setValueNotifyingHost (0.1f);
         processor.setStateInformation (initialState.getData(), int (initialState.getSize())); pump();
         require (std::abs (find<juce::Slider> (editor, ParamIDs::width (0))->getValue() - 90) < 0.1,
                  "Restored state did not reach editor");
+        const auto presetFile = output.getChildFile ("editor-preset-test.teratoamor");
+        require (processor.savePresetToFile (presetFile), "Preset file was not saved");
+        auto* master = processor.apvts.getParameter (ParamIDs::masterLevel);
+        master->setValueNotifyingHost (master->convertTo0to1 (22.0f));
+        require (processor.loadPresetFromFile (presetFile), "Preset file was not loaded");
+        require (std::abs (processor.apvts.getRawParameterValue (ParamIDs::masterLevel)->load() - 70.0f) < 0.1f,
+                 "Loaded preset did not restore Master volume");
+        require (processor.getPresetName() == "editor-preset-test", "Loaded preset name was not shown");
+        master->setValueNotifyingHost (master->convertTo0to1 (22.0f));
+        processor.resetToInitialState();
+        require (std::abs (processor.apvts.getRawParameterValue (ParamIDs::masterLevel)->load() - 70.0f) < 0.1f
+                 && processor.getPresetName() == "Initial State", "INIT did not restore parameter defaults");
         std::cout << "Editor checks passed: parameter coverage, two-way attachments, links, state, tabs, bounds and snapshots.\n";
         return 0;
     }

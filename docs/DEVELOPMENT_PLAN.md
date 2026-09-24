@@ -129,8 +129,8 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [x] Add distortion with Type: Bypass, Drive (`dist_type`, version hint 8), plus Drive and Tone (existing `dist_crush`, `dist_tone` IDs retained). After global filter, before Master. Drive maximum increased from 8x to 10x with modest makeup; Tone now has a 700 Hz split and +/-12 dB treble range. Drive 0 is dry; new instances default to Bypass. Knobs and type transitions are smoothed; older distortion states migrate to Drive, including the retired Bitcrush choice (removed after listening feedback). User-requested original extensions, pending listening feedback.
 - [x] Add two parallel mono delay lines (`Source/DSP/ParallelDelay.h`), independently enabled, with shared Mix and wet-only Cut; each has Rate, Decay, and Pan (-100..100, centre mono). Parameters appended at version hint 9; older states disable both lines. Preallocated 48-second buffers, smoothed controls, read-head crossfades, bounded feedback, state-restore reset, and host tail reporting. Dedicated `TeratoamorDelayTests` passes; listening refinement of Cut and Decay remains. See `CHIMERA_REFERENCE.md` for exact initial mappings.
 - [x] Sync delay Rates (1/64T through 4/1, straight/triplet/dotted) to host tempo, with 120 BPM fallback when absent. Supported BPM 20..400; tempo and Rate changes crossfade. Future tempo-based features still need their own integration.
-- [ ] Add other types of noise.
-- [ ] Add potential way of letting user load their own noise.
+- [ ] Investigate additional noise types as sources for the filters within each Element (see the feature to-dos below).
+- [ ] After adding more noise types, investigate user-loaded loops as noise sources, initially limited to 6 seconds (see the feature to-dos below).
 
 ### Milestone 4: modulation and performance
 
@@ -144,7 +144,7 @@ Deliver the smallest useful instrument before expanding the feature set.
   - Modulation cannot revive an Element that is off or in Off mode (Volume). Old saved projects load with Depth 0 and Wave Off.
 - [ ] Add MIDI routing and aftertouch.
 - [x] Add Glide (`master_glide`, 0..100, version hint 11): every new note slides in a straight line (in semitones) from the previously played note's pitch to its own, in 0 to 2 seconds (Glide 100 = 2 s); 0 is off, and it applies to every note, not only legato. Chosen by design and open to tuning by ear: legato-only mode, an exponential slide, or a different maximum time.
-- [x] Add tempo Sync (`master_sync`, default on) and a manual tempo (`master_bpm`, 20..400, default 120). Sync on uses the host tempo when the host gives one, otherwise the manual tempo; Sync off always uses the manual tempo. Delay Rates and modulation Rates use it. The editor dims the manual tempo with Sync on but leaves it editable as the fallback when the host supplies no tempo.
+- [x] Add tempo Sync (`master_sync`, default on) and a manual tempo (`master_bpm`, 20..400, default 120). Sync on uses the host tempo when the host gives one, otherwise the manual tempo; Sync off always uses the manual tempo. Delay Rates and modulation Rates use it. The editor shows the effective BPM and disables manual editing with HOST SYNC on; the saved manual value remains the fallback when the host supplies no tempo.
 - [x] Feed and draw a master stereo output peak meter beside Master in the persistent GUI header. `outputPeakLeft/Right` accumulate block peaks until consumed by the 30 Hz GUI timer, with decay and a clip indicator.
 - [ ] MIDI section (later patch): Pitchbend Range (currently fixed at +/-2 semitones in `Engine::pitchBendRangeSemitones`), four CC slots (CC number, target, Depth -100..100) and Aftertouch with a target and Depth. The modulation targets and per-chunk `units` array are the intended framework: CC and aftertouch values can add to the same units as the six sections, so no restructuring is needed. Leave room for this section in the designed GUI.
 - [x] Add master pan (`master_pan`, -100..100, same constant-power law as the Elements). Remaining master controls: to be decided.
@@ -157,6 +157,20 @@ Deliver the smallest useful instrument before expanding the feature set.
 - [ ] Create original Teratoamor presets without Chimera preset compatibility or copied names.
 - [ ] Complete DAW compatibility, state, automation, performance, and long-run stability testing.
 - [ ] Audit licences, notices, packaging, and the clean-room boundary before distribution.
+
+## To-do: fixes and bugs
+
+Added from user feedback on 2026-09-23; all items are pending.
+
+- [ ] **Filter:** Check where the filter module comes in the processing order.
+- [ ] **Filter:** Change the lowest and highest cutoff frequencies; new limits to be decided.
+- [ ] **Filter:** Check and change the lowest and highest Q values; new limits to be decided.
+- [ ] **Engine / Occasional overdrive:** Investigate occasional overdriven hits or sparkle that sound too distorted. The user reports these occur independently of Warp. The source is unknown; Main Output is one possibility to check. This replaces the earlier request to lower Warp saturation.
+- [x] **Modulation:** Add Volume for every Element to all six modulation target dropdowns, appended after existing choices to retain saved target indices.
+- [x] **Presets:** Save and load `.teratoamor` state files, defaulting to `Documents/Teratoamor/Presets`. The header's arrows browse files in the current preset folder; clicking the name opens a file, SAVE chooses a name and location, and INIT restores parameter defaults.
+- [ ] **Feature / Noise types:** Look into adding more types of noise for the filters within the Element modules to process. The current source is white noise.
+- [ ] **Feature / Loops as noise:** After adding more noise types, look into loading user loops as noise sources for the Element filters, initially no longer than 6 seconds.
+- [ ] **Envelope / Chimera observation:** The user reports a slight little puff of attack even with all ADSRT controls at 0. Investigate this behaviour and consider whether to add it to Teratoamor; this is a listening observation, not yet a measured or confirmed implementation requirement.
 
 ## Working rules
 

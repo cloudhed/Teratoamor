@@ -90,8 +90,8 @@ struct DelayParams
     std::array<DelayLineParams, 2> lines;
 };
 
-// Everything a modulation section can drive. The order is stored by nothing (hosts store each
-// section's choice index, see ModTargets::listFor), but keep it stable anyway.
+// Everything a modulation section can drive. Hosts store each section's choice index,
+// so new targets must be appended and listFor must preserve old indices.
 enum class ModTarget
 {
     el1Width = 0, el1Pitch, el1Pan, el1Warp, el1Clip,
@@ -104,6 +104,7 @@ enum class ModTarget
     mod1Depth, mod2Depth, mod3Depth,
     mod4Rate, mod5Rate, mod6Rate,
     masterPan, masterVolume,
+    el1Volume, el2Volume, el3Volume,
     count
 };
 
@@ -127,7 +128,8 @@ namespace ModTargets
         "Delay Pan", "Delay Filter",
         "Modulation1 Depth", "Modulation2 Depth", "Modulation3 Depth",
         "Modulation4 Rate", "Modulation5 Rate", "Modulation6 Rate",
-        "Master Pan", "Master Volume" }};
+        "Master Pan", "Master Volume",
+        "Element1 Volume", "Element2 Volume", "Element3 Volume" }};
 
     // The dropdown of one section (0..2 = envelopes, 3..5 = oscillators). The host stores an
     // index into this list, so the order must not change once released.
@@ -148,8 +150,8 @@ namespace ModTargets
             {
                 if (t == ModTarget::distortCrush || t == ModTarget::distortTone)
                     continue;
-                if (i > static_cast<int> (ModTarget::filterQ))
-                    break;
+                if (i > static_cast<int> (ModTarget::filterQ) && i < static_cast<int> (ModTarget::el1Volume))
+                    continue;
             }
             else if (i == static_cast<int> (ModTarget::mod4Rate) + (section - 3))
             {

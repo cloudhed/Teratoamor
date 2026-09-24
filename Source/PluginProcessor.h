@@ -4,6 +4,8 @@
 #include "DSP/Engine.h"
 #include "Parameters/ParameterIDs.h"
 #include "Parameters/Parameters.h"
+#include <array>
+#include <cstdint>
 
 class TeratoamorAudioProcessor final : public juce::AudioProcessor
 {
@@ -37,14 +39,33 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    void resetToInitialState();
+    bool savePresetToFile (const juce::File& file);
+    bool loadPresetFromFile (const juce::File& file);
+    juce::String getPresetName() const;
+    static juce::File defaultPresetFolder();
 
     juce::AudioProcessorValueTreeState apvts;
 
     // Maximum output magnitude since the editor last consumed it (may exceed 1 at clipping).
     // The audio thread accumulates; the GUI exchanges with zero. Never persisted in patch state.
     std::atomic<float> outputPeakLeft { 0.0f }, outputPeakRight { 0.0f };
+    std::atomic<int> activeVoices { 0 };
+    // Increments once for each audio block containing incoming MIDI, so the
+    // editor can briefly illuminate the activity light even for short events.
+    std::atomic<uint32_t> midiActivityCounter { 0 };
+
+    static constexpr size_t spectrumSize = 2048;
+    // Atomic ring of final stereo output. The GUI copies it and performs the FFT;
+    // the audio thread only stores samples and never waits for the GUI.
+    void copySpectrumSamples (std::array<float, spectrumSize>& destination) const noexcept;
+    double getSpectrumSampleRate() const noexcept { return spectrumSampleRate.load (std::memory_order_relaxed); }
+    double getCurrentBpm() const noexcept { return hostBpm.load (std::memory_order_relaxed); }
 
 private:
+    std::array<std::atomic<float>, spectrumSize> spectrumSamples {};
+    std::atomic<uint64_t> spectrumCursor { 0 };
+    std::atomic<double> spectrumSampleRate { 44100.0 };
     EngineParams readParams() const noexcept;
 
     // Raw parameter values, looked up once so the audio thread never searches by name.

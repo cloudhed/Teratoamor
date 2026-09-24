@@ -33,15 +33,15 @@ namespace Modulation
     // Modulation of one Element control: its own target plus the matching "All" target.
     inline float elementUnits (const Units& u, int element, Kind kind) noexcept
     {
-        static constexpr ModTarget own[3][5] = {
-            { ModTarget::el1Width, ModTarget::el1Pitch, ModTarget::el1Pan, ModTarget::el1Warp, ModTarget::el1Clip },
-            { ModTarget::el2Width, ModTarget::el2Pitch, ModTarget::el2Pan, ModTarget::el2Warp, ModTarget::count },
-            { ModTarget::el3Width, ModTarget::el3Pitch, ModTarget::el3Pan, ModTarget::el3Warp, ModTarget::count } };
+        static constexpr ModTarget own[3][6] = {
+            { ModTarget::el1Width, ModTarget::el1Pitch, ModTarget::el1Pan, ModTarget::el1Warp, ModTarget::el1Clip, ModTarget::el1Volume },
+            { ModTarget::el2Width, ModTarget::el2Pitch, ModTarget::el2Pan, ModTarget::el2Warp, ModTarget::count, ModTarget::el2Volume },
+            { ModTarget::el3Width, ModTarget::el3Pitch, ModTarget::el3Pan, ModTarget::el3Warp, ModTarget::count, ModTarget::el3Volume } };
 
         float sum = 0.0f;
         const int k = static_cast<int> (kind);
 
-        if (k < 5 && own[element][k] != ModTarget::count)
+        if (own[element][k] != ModTarget::count)
             sum += u[idx (own[element][k])];
 
         switch (kind)

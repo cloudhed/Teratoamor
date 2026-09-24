@@ -77,6 +77,10 @@ TeratoamorAudioProcessor::TeratoamorAudioProcessor()
 void TeratoamorAudioProcessor::prepareToPlay (double sampleRate, int)
 {
     engine.prepare (sampleRate);
+    activeVoices.store (0, std::memory_order_relaxed);
+    spectrumSampleRate.store (sampleRate, std::memory_order_relaxed);
+    spectrumCursor.store (0, std::memory_order_relaxed);
+    for (auto& sample : spectrumSamples) sample.store (0.0f, std::memory_order_relaxed);
     outputPeakLeft.store (0.0f);
     outputPeakRight.store (0.0f);
 }
@@ -84,6 +88,7 @@ void TeratoamorAudioProcessor::prepareToPlay (double sampleRate, int)
 void TeratoamorAudioProcessor::releaseResources()
 {
     engine.reset();
+    activeVoices.store (0, std::memory_order_relaxed);
     outputPeakLeft.store (0.0f);
     outputPeakRight.store (0.0f);
 }
@@ -170,6 +175,8 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 {
     juce::ScopedNoDenormals noDenormals;
 
+    if (! midiMessages.isEmpty()) midiActivityCounter.fetch_add (1, std::memory_order_relaxed);
+
     const int numSamples = buffer.getNumSamples();
     auto* left  = buffer.getWritePointer (0);
     auto* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : left;
@@ -217,6 +224,8 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     if (rendered < numSamples)
         engine.render (left + rendered, right + rendered, numSamples - rendered);
 
+    activeVoices.store (engine.activeVoiceCount(), std::memory_order_relaxed);
+
     midiMessages.clear();
 
     // Preserve short transients between GUI ticks. Atomic max tolerates the GUI
@@ -230,6 +239,18 @@ void TeratoamorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const auto leftPeak = buffer.getMagnitude (0, 0, numSamples);
     publishPeak (outputPeakLeft, leftPeak);
     publishPeak (outputPeakRight, buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, numSamples) : leftPeak);
+
+    auto cursor = spectrumCursor.load (std::memory_order_relaxed);
+    for (int i = 0; i < numSamples; ++i)
+        spectrumSamples[static_cast<size_t> (cursor++) % spectrumSize].store (0.5f * (left[i] + right[i]), std::memory_order_relaxed);
+    spectrumCursor.store (cursor, std::memory_order_release);
+}
+
+void TeratoamorAudioProcessor::copySpectrumSamples (std::array<float, spectrumSize>& destination) const noexcept
+{
+    const auto cursor = spectrumCursor.load (std::memory_order_acquire);
+    for (size_t i = 0; i < spectrumSize; ++i)
+        destination[i] = spectrumSamples[(static_cast<size_t> (cursor) + i) % spectrumSize].load (std::memory_order_relaxed);
 }
 
 double TeratoamorAudioProcessor::getTailLengthSeconds() const
@@ -260,6 +281,55 @@ void TeratoamorAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 
     if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
+}
+
+juce::File TeratoamorAudioProcessor::defaultPresetFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+        .getChildFile ("Teratoamor").getChildFile ("Presets");
+}
+
+juce::String TeratoamorAudioProcessor::getPresetName() const
+{
+    return apvts.state.getProperty ("presetName", "Initial State").toString();
+}
+
+void TeratoamorAudioProcessor::resetToInitialState()
+{
+    auto state = apvts.copyState();
+    for (auto* base : getParameters())
+        if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (base))
+        {
+            auto value = state.getChildWithProperty ("id", parameter->paramID);
+            if (value.isValid())
+                value.setProperty ("value", parameter->convertFrom0to1 (parameter->getDefaultValue()), nullptr);
+        }
+    state.setProperty ("presetName", "Initial State", nullptr);
+    apvts.replaceState (state);
+    resetEngineOnNextBlock.store (true);
+}
+
+bool TeratoamorAudioProcessor::savePresetToFile (const juce::File& file)
+{
+    if (! file.hasFileExtension (".teratoamor")) return false;
+    const auto oldName = getPresetName();
+    apvts.state.setProperty ("presetName", file.getFileNameWithoutExtension(), nullptr);
+    juce::MemoryBlock data;
+    getStateInformation (data);
+    if (file.replaceWithData (data.getData(), data.getSize())) return true;
+    apvts.state.setProperty ("presetName", oldName, nullptr);
+    return false;
+}
+
+bool TeratoamorAudioProcessor::loadPresetFromFile (const juce::File& file)
+{
+    juce::MemoryBlock data;
+    if (! file.hasFileExtension (".teratoamor") || ! file.loadFileAsData (data)) return false;
+    const auto xml = getXmlFromBinary (data.getData(), static_cast<int> (data.getSize()));
+    if (xml == nullptr || juce::ValueTree::fromXml (*xml).getType() != Parameters::stateType) return false;
+    setStateInformation (data.getData(), static_cast<int> (data.getSize()));
+    apvts.state.setProperty ("presetName", file.getFileNameWithoutExtension(), nullptr);
+    return true;
 }
 
 void TeratoamorAudioProcessor::setStateInformation (const void* data, int sizeInBytes)

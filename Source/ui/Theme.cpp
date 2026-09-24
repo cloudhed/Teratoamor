@@ -134,6 +134,13 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, cons
     g.drawRoundedRectangle (r, 9, b.getToggleState() ? Theme::accentBorderWidth : Theme::borderWidth);
 }
 
+juce::Font LookAndFeel::getTextButtonFont (juce::TextButton& button, int height)
+{
+    if (button.getComponentID() == "presetInit" || button.getComponentID() == "presetSave")
+        return juce::Font (juce::FontOptions (10.0f));
+    return juce::LookAndFeel_V4::getTextButtonFont (button, height);
+}
+
 void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool over, bool)
 {
     const auto y = float (b.getHeight()) * 0.5f;

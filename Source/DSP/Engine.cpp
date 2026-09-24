@@ -189,6 +189,14 @@ void Engine::setPitchBend (float position)
     pitchBend.target = std::clamp (position, -1.0f, 1.0f) * pitchBendRangeSemitones;
 }
 
+int Engine::activeVoiceCount() const noexcept
+{
+    int count = 0;
+    for (const auto& voice : voices)
+        if (voice.isActive()) ++count;
+    return count;
+}
+
 ElementFrames Engine::nextFrames() noexcept
 {
     ElementFrames frames;

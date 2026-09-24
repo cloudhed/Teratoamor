@@ -30,6 +30,7 @@ Before planning or implementing changes, read:
 - Guard resonant filters against instability, NaN, and infinity, especially near maximum Width.
 - Use deterministic, independently seeded noise sources for every voice and Element.
 - Retain host parameter IDs once released, and save and restore parameter state.
+- Increment the patch/build number in the root CMake `project(... VERSION ...)` only when deliberately making a versioned build to share, install, or mark a meaningful milestone, or when the user requests it. Routine edits, local builds, and tests can keep the current version. Keep parameter version hints and saved-state versions separate; change those only when their formats require it.
 - Do not add a dependency with a potentially incompatible licence without explaining it and obtaining approval first.
 - After implementation changes, configure and build when possible. Report the exact commands, results, and output artifact locations.
 - Explain commands and errors in plain language suitable for someone new to C++, CMake, JUCE, and VS Code.
@@ -52,3 +53,10 @@ cmake -S . -B build -A x64
 cmake --build build --config Debug
 ```
 
+## Windows build access note
+
+Changing the CMake project version can regenerate JUCE resources and trigger a broader rebuild. A version increment does **not** require a new build directory: reuse the configured build directory for normal development. A fresh directory incurs a full first-time JUCE build and should be reserved for a genuinely broken build cache.
+
+On 2026-09-24, MSBuild in the restricted Codex filesystem sandbox could not update an existing VST3 `*.tlog` file (`MSB6003: Access ... is denied`). A fresh build directory also failed while deleting JUCE's generated `unsuccessfulbuild` file (`MSB3061`). Running CMake configuration and the build with build-tool access outside that sandbox succeeded, followed by all four tests.
+
+In a restricted Codex session, use the required sandbox escalation for CMake configuration and build when this permission problem is known to affect the build directory. If either generated-file access error recurs, rerun configure and build with that access in the **same build directory**. Do this before trying a serial build or making another build directory; neither fixed this access problem. Keep `build/` ignored and do not change `external/JUCE` or repository file permissions as a workaround.

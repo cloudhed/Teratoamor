@@ -82,9 +82,26 @@ int main()
         {
             return std::find (l.items.begin(), l.items.begin() + l.size, t) != l.items.begin() + l.size;
         };
-        check (env.size == 20 && has (env, ModTarget::filterQ) && ! has (env, ModTarget::distortTone), "envelope dropdown has 20 entries");
-        check (osc4.size == 31 && ! has (osc4, ModTarget::mod4Rate) && has (osc4, ModTarget::mod5Rate), "Modulation 4 omits its own Rate");
+        check (env.size == 23 && env.items[19] == ModTarget::filterQ && ! has (env, ModTarget::distortTone), "envelope keeps old target indices");
+        check (osc4.size == 34 && osc4.items[30] == ModTarget::masterVolume
+            && ! has (osc4, ModTarget::mod4Rate) && has (osc4, ModTarget::mod5Rate), "oscillator keeps old target indices");
         check (! has (osc5, ModTarget::mod5Rate) && has (osc5, ModTarget::masterPan), "Modulation 5 omits its own Rate");
+        bool allVolumes = true;
+        for (int section = 0; section < 6; ++section)
+        {
+            const auto list = ModTargets::listFor (section);
+            allVolumes = allVolumes && list.items[(size_t) list.size - 3] == ModTarget::el1Volume
+                && list.items[(size_t) list.size - 2] == ModTarget::el2Volume
+                && list.items[(size_t) list.size - 1] == ModTarget::el3Volume;
+        }
+        check (allVolumes, "all six modulator dropdowns append three Element Volume targets");
+        Modulation::Units volumeUnits {};
+        volumeUnits[Modulation::idx (ModTarget::el2Volume)] = -30.0f;
+        volumeUnits[Modulation::idx (ModTarget::allVolume)] = 10.0f;
+        check (Modulation::elementUnits (volumeUnits, 0, Modulation::Kind::volume) == 10.0f
+            && Modulation::elementUnits (volumeUnits, 1, Modulation::Kind::volume) == -20.0f
+            && Modulation::elementUnits (volumeUnits, 2, Modulation::Kind::volume) == 10.0f,
+            "individual Volume affects only its Element and combines with All Volume");
     }
 
     // Pitch depth scale (0.36 semitones per unit, Depth 100 = three octaves): a Pulse on All Pitch. The free oscillator value

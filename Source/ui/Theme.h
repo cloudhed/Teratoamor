@@ -30,6 +30,13 @@ namespace Layout
     constexpr int defaultWidth = 1440, minimumWidth = 1200, maximumWidth = 2400;
     constexpr int margin = 20, gap = 14, padding = 22;
     constexpr int header = 100, elements = 510, ribbon = 30, tabs = 48, footer = 24;
+    constexpr int headerPresetLeft = 355, headerPresetWidth = 405;
+    constexpr int headerMeterWidth = 218, headerMasterWidth = 120, headerTempoWidth = 120;
+    constexpr int headerSpectrumWidth = 230, headerVoicesWidth = 55, headerControlGap = 12;
+    constexpr int headerBrowserHeight = 54;
+    constexpr int headerSectionTop = 10, headerSectionHeight = 80;
+    constexpr int headerSectionFooterTop = 55, headerSectionFooterHeight = 23;
+    constexpr int headerSpectrumInset = 10;
     constexpr float radius = 22.0f;
     constexpr float pitchFraction = 0.23f, widthFraction = 0.43f, envelopeFraction = 0.60f;
     constexpr float soundHeightFraction = 0.60f;
@@ -52,6 +59,7 @@ public:
     void drawLinearSlider (juce::Graphics&, int, int, int, int, float, float, float,
                            juce::Slider::SliderStyle, juce::Slider&) override;
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool, bool) override;
+    juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool, bool) override;
     void drawComboBox (juce::Graphics&, int, int, bool, int, int, int, int, juce::ComboBox&) override;
 };

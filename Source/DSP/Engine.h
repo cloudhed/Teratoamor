@@ -43,6 +43,7 @@ public:
 
     // Overwrites left/right with numSamples of output.
     void render (float* left, float* right, int numSamples);
+    int activeVoiceCount() const noexcept;
 
 private:
     // One-pole smoother evaluated once per control chunk.

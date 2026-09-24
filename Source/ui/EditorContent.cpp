@@ -1,5 +1,7 @@
 #include "EditorContent.h"
 #include <TeratoamorAssets.h>
+#include <juce_dsp/juce_dsp.h>
+#include <algorithm>
 #include <cmath>
 
 namespace teratoamor::ui
@@ -21,7 +23,8 @@ void caption (juce::Graphics& g, const juce::String& text, juce::Rectangle<int> 
 class ParameterControl final : public juce::Component
 {
 public:
-    ParameterControl (State& state, const juce::String& id, const juce::String& name, bool vertical = false)
+    ParameterControl (State& state, const juce::String& id, const juce::String& name,
+                      bool vertical = false, bool showLabel = true) : displayLabel (showLabel)
     {
         auto* p = state.getParameter (id);
         jassert (p != nullptr);
@@ -43,7 +46,7 @@ public:
         slider.setVelocityModeParameters (0.25, 1, 0.0, true, juce::ModifierKeys::shiftModifier);
         slider.setWantsKeyboardFocus (true);
         slider.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
-        addAndMakeVisible (label);
+        if (displayLabel) addAndMakeVisible (label);
         addAndMakeVisible (slider);
         attachment = std::make_unique<State::SliderAttachment> (state, id, slider);
         slider.setDoubleClickReturnValue (true, p->convertFrom0to1 (p->getDefaultValue()));
@@ -62,7 +65,7 @@ public:
     void resized() override
     {
         auto r = getLocalBounds();
-        label.setBounds (r.removeFromBottom (22));
+        if (displayLabel) label.setBounds (r.removeFromBottom (22));
         slider.setBounds (r);
     }
     void available (bool enabled, const juce::String& reason = {})
@@ -73,6 +76,7 @@ public:
     }
     juce::Slider slider;
 private:
+    bool displayLabel;
     juce::Label label;
     std::unique_ptr<State::SliderAttachment> attachment;
 };
@@ -149,6 +153,64 @@ public:
 private:
     juce::Label label;
     std::unique_ptr<State::ComboBoxAttachment> attachment;
+};
+
+// The host's target choice indices are already in saved projects. Give the
+// dropdown a friendlier order while its item IDs retain those original indices.
+class ModTargetChoice final : public juce::Component
+{
+public:
+    ModTargetChoice (State& state, int section)
+        : parameter (*state.getParameter (ParamIDs::mod (section, "target"))),
+          attachment (parameter, [this] (float value)
+          {
+              box.setSelectedId (juce::roundToInt (value) + 1, juce::dontSendNotification);
+          }, state.undoManager)
+    {
+        label.setText ("DESTINATION", juce::dontSendNotification);
+        label.setFont (juce::FontOptions (12));
+        label.setColour (juce::Label::textColourId, Theme::mauve);
+        box.setName (parameter.getName (100));
+        box.setComponentID (ParamIDs::mod (section, "target"));
+        box.setScrollWheelEnabled (false);
+
+        const auto targets = ModTargets::listFor (section);
+        for (int i = 0; i < targets.size; ++i)
+        {
+            const auto target = targets.items[(size_t) i];
+            if (target == ModTarget::el1Width || target == ModTarget::el2Width || target == ModTarget::el3Width)
+            {
+                const auto volume = target == ModTarget::el1Width ? ModTarget::el1Volume
+                                  : target == ModTarget::el2Width ? ModTarget::el2Volume : ModTarget::el3Volume;
+                for (int j = 0; j < targets.size; ++j)
+                    if (targets.items[(size_t) j] == volume)
+                        box.addItem (ModTargets::names[(size_t) volume], j + 1);
+            }
+            if (target == ModTarget::el1Volume || target == ModTarget::el2Volume || target == ModTarget::el3Volume)
+                continue;
+            box.addItem (ModTargets::names[(size_t) target], i + 1);
+        }
+
+        addAndMakeVisible (label);
+        addAndMakeVisible (box);
+        box.onChange = [this]
+        {
+            if (box.getSelectedId() > 0)
+                attachment.setValueAsCompleteGesture (float (box.getSelectedId() - 1));
+        };
+        attachment.sendInitialUpdate();
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        label.setBounds (r.removeFromTop (20));
+        box.setBounds (r.removeFromTop (32));
+    }
+    juce::ComboBox box;
+private:
+    juce::RangedAudioParameter& parameter;
+    juce::Label label;
+    juce::ParameterAttachment attachment;
 };
 
 class Toggle final : public juce::ToggleButton
@@ -512,7 +574,7 @@ class ModEnvelopePanel final : public Panel
 public:
     ModEnvelopePanel (State& s, int index)
         : Panel ("MOD " + juce::String (index + 1) + " / ENVELOPE"),
-          target (s, ParamIDs::mod (index, "target"), "DESTINATION"),
+          target (s, index),
           depth (s, ParamIDs::mod (index, "depth"), "DEPTH"), graph (s, index, true)
     {
         for (auto* c : std::initializer_list<juce::Component*> { &target, &depth, &graph }) addAndMakeVisible (*c);
@@ -527,7 +589,8 @@ public:
     void resized() override
     {
         auto r = body();
-        target.setBounds (r.removeFromTop (54));
+        auto targetRow = r.removeFromTop (54);
+        target.setBounds (targetRow.removeFromLeft (juce::roundToInt (targetRow.getWidth() * Layout::modSelectorsFraction)));
         r.removeFromTop (8);
         depth.setBounds (r.removeFromRight (Layout::modDepthWidth));
         auto plot = r.removeFromRight (Layout::modGraphWidth);
@@ -536,7 +599,7 @@ public:
         for (auto& control : envelope) control->setBounds (r.removeFromLeft (cell));
     }
 private:
-    Choice target;
+    ModTargetChoice target;
     ParameterControl depth;
     EnvelopeDisplay graph;
     std::array<std::unique_ptr<ParameterControl>, 5> envelope;
@@ -547,7 +610,7 @@ class ModOscillatorPanel final : public Panel
 public:
     ModOscillatorPanel (State& s, int index)
         : Panel ("MOD " + juce::String (index + 1) + " / OSCILLATOR"),
-          target (s, ParamIDs::mod (index, "target"), "DESTINATION"),
+          target (s, index),
           wave (s, ParamIDs::mod (index, "wave"), "WAVE"),
           rate (s, ParamIDs::mod (index, "rate"), "RATE"),
           gate (s, ParamIDs::mod (index, "gate"), "Gate Trig"),
@@ -561,9 +624,11 @@ public:
     {
         gate.setBounds (getWidth() - 150, 15, 128, 28);
         auto r = body();
-        target.setBounds (r.removeFromTop (54));
+        auto targetRow = r.removeFromTop (54);
         r.removeFromTop (8);
-        auto selectors = r.removeFromLeft (juce::roundToInt (r.getWidth() * Layout::modSelectorsFraction));
+        const int selectorsWidth = juce::roundToInt (r.getWidth() * Layout::modSelectorsFraction);
+        target.setBounds (targetRow.removeFromLeft (selectorsWidth));
+        auto selectors = r.removeFromLeft (selectorsWidth);
         wave.setBounds (selectors.removeFromTop (54));
         selectors.removeFromTop (6);
         rate.setBounds (selectors);
@@ -572,7 +637,8 @@ public:
         soft.setBounds (r);
     }
 private:
-    Choice target, wave, rate;
+    ModTargetChoice target;
+    Choice wave, rate;
     Toggle gate;
     ParameterControl depth, soft;
 };
@@ -653,49 +719,429 @@ private:
     int clipFrames = 0;
 };
 
+class OutputSpectrum final : public juce::Component, private juce::Timer
+{
+public:
+    explicit OutputSpectrum (TeratoamorAudioProcessor& p) : processor (p)
+    {
+        setTitle ("Live output frequency spectrum");
+        startTimerHz (30);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto plot = getLocalBounds().toFloat().reduced (1.0f);
+        g.setColour (Theme::panel);
+        g.fillRoundedRectangle (plot, 6.0f);
+        g.setColour (Theme::border.withAlpha (0.55f));
+        g.drawRoundedRectangle (plot, 6.0f, 1.0f);
+        plot = plot.reduced (7.0f, 6.0f);
+        for (float fraction : { 0.25f, 0.5f, 0.75f })
+        {
+            const auto y = plot.getY() + plot.getHeight() * fraction;
+            g.setColour (Theme::border.withAlpha (0.18f));
+            g.drawHorizontalLine (juce::roundToInt (y), plot.getX(), plot.getRight());
+        }
+
+        juce::Path area, line;
+        for (size_t i = 0; i < levels.size(); ++i)
+        {
+            const float x = plot.getX() + plot.getWidth() * float (i) / float (levels.size() - 1);
+            const float y = plot.getBottom() - plot.getHeight() * levels[i];
+            if (i == 0) { line.startNewSubPath (x, y); area.startNewSubPath (x, plot.getBottom()); area.lineTo (x, y); }
+            else { line.lineTo (x, y); area.lineTo (x, y); }
+        }
+        area.lineTo (plot.getRight(), plot.getBottom());
+        area.closeSubPath();
+        g.setColour (Theme::violet.withAlpha (0.28f)); g.fillPath (area);
+        g.setColour (Theme::coral); g.strokePath (line, juce::PathStrokeType (1.6f));
+    }
+
+private:
+    void timerCallback() override
+    {
+        std::array<float, TeratoamorAudioProcessor::spectrumSize> samples;
+        processor.copySpectrumSamples (samples);
+        fftData.fill (0.0f);
+        for (size_t i = 0; i < samples.size(); ++i)
+        {
+            const float phase = float (i) / float (samples.size() - 1);
+            fftData[i] = samples[i] * (0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * phase));
+        }
+        fft.performFrequencyOnlyForwardTransform (fftData.data());
+
+        const float sampleRate = static_cast<float> (processor.getSpectrumSampleRate());
+        const float upper = juce::jmin (18000.0f, sampleRate * 0.45f);
+        for (size_t i = 0; i < levels.size(); ++i)
+        {
+            const float x = float (i) / float (levels.size() - 1);
+            const float frequency = 60.0f * std::pow (upper / 60.0f, x);
+            const int centre = juce::jlimit (1, 1023, juce::roundToInt (frequency * float (samples.size()) / sampleRate));
+            float magnitude = 0.0f;
+            for (int bin = juce::jmax (1, centre - 1); bin <= juce::jmin (1023, centre + 1); ++bin)
+                magnitude = juce::jmax (magnitude, fftData[static_cast<size_t> (bin)]);
+            const float db = juce::Decibels::gainToDecibels (magnitude / float (samples.size()), -90.0f);
+            levels[i] = juce::jmax (juce::jlimit (0.0f, 1.0f, (db + 85.0f) / 65.0f), levels[i] - 0.055f);
+        }
+        repaint();
+    }
+
+    TeratoamorAudioProcessor& processor;
+    juce::dsp::FFT fft { 11 };
+    std::array<float, TeratoamorAudioProcessor::spectrumSize * 2> fftData {};
+    std::array<float, 64> levels {};
+};
+
+class PresetStrip final : public juce::Component
+{
+public:
+    explicit PresetStrip (TeratoamorAudioProcessor& p) : processor (p), folder (p.defaultPresetFolder()),
+        previous ("<"), name ("Initial State"), next (">"), init ("INIT"), save ("SAVE")
+    {
+        for (auto* button : { &previous, &name, &next, &init, &save }) addAndMakeVisible (*button);
+        previous.setComponentID ("presetPrevious"); name.setComponentID ("presetName");
+        next.setComponentID ("presetNext"); init.setComponentID ("presetInit"); save.setComponentID ("presetSave");
+        previous.setTooltip ("Previous preset"); next.setTooltip ("Next preset");
+        name.setTooltip ("Open a preset file"); init.setTooltip ("Restore the Initial State");
+        save.setTooltip ("Save the current sound as a preset file");
+        previous.onClick = [this] { step (-1); };
+        next.onClick = [this] { step (1); };
+        name.onClick = [this] { open(); };
+        init.onClick = [this] { processor.resetToInitialState(); selected = {}; refreshName(); };
+        save.onClick = [this] { saveAs(); };
+        refreshName();
+    }
+
+    void refreshName()
+    {
+        const auto current = processor.getPresetName();
+        if (name.getButtonText() != current) name.setButtonText (current);
+    }
+
+    void resized() override
+    {
+        auto browser = getLocalBounds();
+        auto actions = browser.removeFromRight (48).reduced (0, 6);
+        browser.removeFromRight (8);
+        browser.setY ((getHeight() - Layout::headerBrowserHeight) / 2);
+        browser.setHeight (Layout::headerBrowserHeight);
+        previous.setBounds (browser.removeFromLeft (34));
+        next.setBounds (browser.removeFromRight (34));
+        name.setBounds (browser);
+        init.setBounds (actions.removeFromTop (actions.getHeight() / 2));
+        save.setBounds (actions);
+    }
+
+private:
+    void scan()
+    {
+        files = folder.findChildFiles (juce::File::findFiles, false, "*.teratoamor");
+        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b)
+        {
+            return a.getFileName().compareIgnoreCase (b.getFileName()) < 0;
+        });
+    }
+
+    void load (const juce::File& file)
+    {
+        if (! processor.loadPresetFromFile (file))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon, "Preset could not be loaded",
+                                                      "This is not a valid Teratoamor preset file.");
+            return;
+        }
+        folder = file.getParentDirectory();
+        selected = file;
+        refreshName();
+    }
+
+    void step (int direction)
+    {
+        scan();
+        if (files.isEmpty()) return;
+        const int index = files.indexOf (selected);
+        if (index < 0)
+        {
+            load (direction > 0 ? files.getFirst() : files.getLast());
+            return;
+        }
+        const int nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= files.size())
+        {
+            processor.resetToInitialState(); selected = {}; refreshName();
+            return;
+        }
+        load (files[nextIndex]);
+    }
+
+    void open()
+    {
+        const auto start = folder.isDirectory() ? folder : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        chooser = std::make_unique<juce::FileChooser> ("Open Teratoamor preset", start, "*.teratoamor");
+        juce::Component::SafePointer<PresetStrip> safe (this);
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [safe] (const juce::FileChooser& dialog)
+                              {
+                                  if (safe == nullptr) return;
+                                  const auto file = dialog.getResult();
+                                  if (file != juce::File()) safe->load (file);
+                              });
+    }
+
+    void saveAs()
+    {
+        if (folder.createDirectory().failed())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon, "Preset could not be saved",
+                                                      "The preset folder could not be created.");
+            return;
+        }
+        const auto proposed = processor.getPresetName() == "Initial State" ? "New Preset" : processor.getPresetName();
+        chooser = std::make_unique<juce::FileChooser> ("Save Teratoamor preset", folder.getChildFile (proposed + ".teratoamor"), "*.teratoamor");
+        juce::Component::SafePointer<PresetStrip> safe (this);
+        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                 | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [safe] (const juce::FileChooser& dialog)
+                              {
+                                  if (safe == nullptr) return;
+                                  auto file = dialog.getResult();
+                                  if (file == juce::File()) return;
+                                  file = file.withFileExtension (".teratoamor");
+                                  if (! safe->processor.savePresetToFile (file))
+                                  {
+                                      juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon, "Preset could not be saved",
+                                                                                "The selected file could not be written.");
+                                      return;
+                                  }
+                                  safe->folder = file.getParentDirectory();
+                                  safe->selected = file;
+                                  safe->refreshName();
+                              });
+    }
+
+    TeratoamorAudioProcessor& processor;
+    juce::File folder, selected;
+    juce::Array<juce::File> files;
+    std::unique_ptr<juce::FileChooser> chooser;
+    juce::TextButton previous, name, next, init, save;
+};
+
+class VoiceCount final : public juce::Component, private juce::Timer
+{
+public:
+    explicit VoiceCount (TeratoamorAudioProcessor& p) : processor (p),
+        lastMidiActivity (p.midiActivityCounter.load (std::memory_order_relaxed)) { startTimerHz (10); }
+    void paint (juce::Graphics& g) override
+    {
+        const auto width = float (getWidth());
+        g.setColour (Theme::panel.withAlpha (0.6f));
+        g.fillRoundedRectangle (4.0f, 0.0f, width - 8.0f, 37.0f, 4.0f);
+        g.fillRoundedRectangle (4.0f, 41.0f, width - 8.0f, 35.0f, 4.0f);
+        caption (g, "MIDI", { 0, 2, getWidth(), 13 }, 9, Theme::mauve, juce::Justification::centred);
+        caption (g, "VOICES", { 0, 43, getWidth(), 13 }, 9, Theme::mauve, juce::Justification::centred);
+        const float dotX = width * 0.5f, dotY = 27.0f;
+        if (midiFlashTicks > 0)
+        {
+            g.setColour (Theme::coral.withAlpha (0.10f));
+            g.fillEllipse (dotX - 9, dotY - 9, 18.0f, 18.0f);
+            g.setColour (Theme::coral.withAlpha (0.25f));
+            g.fillEllipse (dotX - 6, dotY - 6, 12.0f, 12.0f);
+        }
+        g.setColour (midiFlashTicks > 0 ? Theme::lightCore : Theme::violet);
+        g.fillEllipse (dotX - 3.5f, dotY - 3.5f, 7.0f, 7.0f);
+        caption (g, juce::String (count), { 0, 56, getWidth(), 18 }, 14, Theme::coral, juce::Justification::centred);
+    }
+private:
+    void timerCallback() override
+    {
+        const int current = processor.activeVoices.load (std::memory_order_relaxed);
+        const auto activity = processor.midiActivityCounter.load (std::memory_order_relaxed);
+        const int previousFlash = midiFlashTicks;
+        if (activity != lastMidiActivity) { lastMidiActivity = activity; midiFlashTicks = 3; }
+        else if (midiFlashTicks > 0) --midiFlashTicks;
+        if (count != current || previousFlash != midiFlashTicks) { count = current; repaint(); }
+    }
+    TeratoamorAudioProcessor& processor;
+    uint32_t lastMidiActivity;
+    int count = 0;
+    int midiFlashTicks = 0;
+};
+
+class HostSyncButton final : public juce::ToggleButton
+{
+public:
+    explicit HostSyncButton (State& state)
+    {
+        setComponentID (ParamIDs::tempoSync);
+        setButtonText ("HOST SYNC");
+        setTooltip ("Follow the host tempo. Click again to use the manual BPM.");
+        attachment = std::make_unique<State::ButtonAttachment> (state, ParamIDs::tempoSync, *this);
+    }
+    void paintButton (juce::Graphics& g, bool over, bool) override
+    {
+        const bool host = getToggleState();
+        const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
+        g.setColour (host ? Theme::coral.withAlpha (0.32f) : Theme::deep.withAlpha (0.42f));
+        g.fillRoundedRectangle (bounds, bounds.getHeight() * 0.5f);
+        g.setColour (host ? Theme::coral.withAlpha (0.9f) : Theme::border.withAlpha (0.7f));
+        g.drawRoundedRectangle (bounds, bounds.getHeight() * 0.5f, 1.2f);
+
+        const float centreY = float (getHeight()) * 0.5f;
+        g.setColour (host ? Theme::lightCore : Theme::mauve);
+        g.drawRoundedRectangle (10.0f, centreY - 4.0f, 13.0f, 8.0f, 4.0f, 1.5f);
+        g.drawRoundedRectangle (17.0f, centreY - 4.0f, 13.0f, 8.0f, 4.0f, 1.5f);
+        if (host)
+        {
+            g.setColour (Theme::coral.withAlpha (0.24f));
+            g.fillEllipse (31.0f, centreY - 7.0f, 14.0f, 14.0f);
+        }
+        g.setColour (host ? Theme::lightCore : Theme::violet);
+        g.fillEllipse (34.0f, centreY - 4.0f, 8.0f, 8.0f);
+        caption (g, "HOST SYNC", { 47, 0, getWidth() - 50, getHeight() }, 10,
+                 host ? Theme::lightCore : over ? Theme::blush : Theme::mauve);
+        if (hasKeyboardFocus (true))
+        {
+            g.setColour (Theme::lightCore);
+            g.drawRoundedRectangle (bounds.reduced (2.0f), bounds.getHeight() * 0.5f, 1.0f);
+        }
+    }
+private:
+    std::unique_ptr<State::ButtonAttachment> attachment;
+};
+
+class HeaderKnobCard final : public juce::Component, private juce::Timer
+{
+public:
+    enum class Kind { tempo, master };
+    HeaderKnobCard (TeratoamorAudioProcessor& p, Kind type)
+        : processor (p), state (p.apvts), kind (type),
+          control (state, type == Kind::tempo ? ParamIDs::tempoBpm : ParamIDs::masterLevel,
+                   type == Kind::tempo ? "BPM" : "dB", false, false)
+    {
+        setComponentID (kind == Kind::tempo ? "headerTempoCard" : "headerMasterCard");
+        control.slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 22);
+        addAndMakeVisible (control);
+        if (kind == Kind::tempo)
+        {
+            control.slider.textFromValueFunction = [this] (double value)
+            {
+                const bool host = state.getRawParameterValue (ParamIDs::tempoSync)->load() >= 0.5f;
+                return juce::String (juce::roundToInt (host ? processor.getCurrentBpm() : value));
+            };
+            hostSync = std::make_unique<HostSyncButton> (state);
+            addAndMakeVisible (*hostSync);
+            hostSync->onClick = [this] { refreshTempo(); };
+            startTimerHz (20);
+            refreshTempo();
+        }
+        else
+        {
+            control.slider.textFromValueFunction = [] (double value)
+            {
+                if (value <= 0.0) return juce::String::fromUTF8 (u8"\u2212\u221e");
+                return juce::String (20.0 * std::log10 (value / 100.0), 1)
+                    .replace ("-", juce::String::fromUTF8 (u8"\u2212"));
+            };
+            control.slider.valueFromTextFunction = [] (const juce::String& text)
+            {
+                const auto normalised = text.trim().replace (juce::String::fromUTF8 (u8"\u2212"), "-");
+                if (normalised == juce::String::fromUTF8 (u8"-\u221e")
+                    || normalised.equalsIgnoreCase ("-inf")) return 0.0;
+                const double db = normalised.getDoubleValue();
+                return juce::jlimit (0.0, 100.0, 100.0 * std::pow (10.0, db / 20.0));
+            };
+            control.slider.updateText();
+        }
+    }
+    void paint (juce::Graphics& g) override
+    {
+        auto box = getLocalBounds().toFloat().reduced (1.0f);
+        g.setColour (Theme::panel);
+        g.fillRoundedRectangle (box, 6.0f);
+        g.setColour (Theme::border.withAlpha (0.55f));
+        g.drawRoundedRectangle (box, 6.0f, 1.0f);
+        caption (g, kind == Kind::tempo ? "BPM" : "dB", { getWidth() - 56, 38, 50, 16 },
+                 10, Theme::mauve, juce::Justification::centred);
+        if (kind == Kind::master)
+            caption (g, "MASTER", { 4, Layout::headerSectionFooterTop, getWidth() - 8,
+                                     Layout::headerSectionFooterHeight }, 10, Theme::mauve,
+                     juce::Justification::centred);
+    }
+    void resized() override
+    {
+        control.setBounds (4, 0, getWidth() - 8, 58);
+        if (hostSync != nullptr)
+            hostSync->setBounds (6, Layout::headerSectionFooterTop,
+                                 getWidth() - 12, Layout::headerSectionFooterHeight);
+    }
+private:
+    void timerCallback() override { refreshTempo(); }
+    void refreshTempo()
+    {
+        const bool host = state.getRawParameterValue (ParamIDs::tempoSync)->load() >= 0.5f;
+        const double bpm = host ? processor.getCurrentBpm() : control.slider.getValue();
+        if (firstRefresh || host != lastHost)
+        {
+            control.slider.setEnabled (! host);
+            control.slider.setTooltip (host ? "Host BPM. Click HOST SYNC to edit the manual tempo."
+                                            : "Manual BPM for delays and modulation.");
+        }
+        if (firstRefresh || host != lastHost || bpm != lastBpm) control.slider.updateText();
+        firstRefresh = false;
+        lastHost = host;
+        lastBpm = bpm;
+    }
+    TeratoamorAudioProcessor& processor;
+    State& state;
+    Kind kind;
+    ParameterControl control;
+    std::unique_ptr<HostSyncButton> hostSync;
+    bool firstRefresh = true, lastHost = false;
+    double lastBpm = -1.0;
+};
+
 class Header final : public juce::Component, private juce::Timer
 {
 public:
-    explicit Header (TeratoamorAudioProcessor& p) : state (p.apvts), master (state, ParamIDs::masterLevel, "MASTER"),
-        tempo (state, ParamIDs::tempoBpm, "BPM"), sync (state, ParamIDs::tempoSync, "Host sync"), meter (p)
+    explicit Header (TeratoamorAudioProcessor& p) : tempo (p, HeaderKnobCard::Kind::tempo),
+        master (p, HeaderKnobCard::Kind::master), meter (p), spectrum (p), presets (p), voices (p)
     {
         logo = juce::ImageCache::getFromMemory (TeratoamorAssets::icon_voidpetal_smaller_margins_png,
                                               TeratoamorAssets::icon_voidpetal_smaller_margins_pngSize);
-        tempo.slider.setSliderStyle (juce::Slider::LinearHorizontal);
-        tempo.slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 58, 24);
-        master.slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 46, 22);
-        for (auto* c : std::initializer_list<juce::Component*> { &master, &tempo, &sync, &meter }) addAndMakeVisible (*c);
+        for (auto* c : std::initializer_list<juce::Component*> { &presets, &voices, &spectrum, &tempo, &master, &meter }) addAndMakeVisible (*c);
         startTimerHz (10); timerCallback();
     }
     void paint (juce::Graphics& g) override
     {
         g.drawImageWithin (logo, 0, 8, 78, getHeight() - 16, juce::RectanglePlacement::centred);
-        caption (g, "T E R A T O A M O R", { 92, 23, 370, 32 }, 25, Theme::blush);
-        caption (g, "THREE FORMS / ONE BECOMING", { 94, 60, 350, 20 }, 11);
+        caption (g, "T E R A T O A M O R", { 92, 23, 250, 32 }, 25, Theme::blush);
         g.setColour (Theme::border.withAlpha (0.4f));
         g.drawHorizontalLine (getHeight() - 1, 0, float (getWidth()));
     }
     void resized() override
     {
         auto r = getLocalBounds().reduced (0, 7);
-        meter.setBounds (r.removeFromRight (218)); r.removeFromRight (20);
-        master.setBounds (r.removeFromRight (145)); r.removeFromRight (30);
-        tempo.setBounds (r.removeFromRight (175).reduced (0, 14)); r.removeFromRight (15);
-        sync.setBounds (r.removeFromRight (132).withSizeKeepingCentre (132, 30));
+        meter.setBounds (r.removeFromRight (Layout::headerMeterWidth)); r.removeFromRight (Layout::headerControlGap);
+        auto masterColumn = r.removeFromRight (Layout::headerMasterWidth); r.removeFromRight (Layout::headerControlGap);
+        master.setBounds (masterColumn.withY (Layout::headerSectionTop).withHeight (Layout::headerSectionHeight));
+        auto tempoColumn = r.removeFromRight (Layout::headerTempoWidth); r.removeFromRight (Layout::headerControlGap);
+        tempo.setBounds (tempoColumn.withY (Layout::headerSectionTop).withHeight (Layout::headerSectionHeight));
+        spectrum.setBounds (r.removeFromRight (Layout::headerSpectrumWidth).reduced (0, 3));
+        r.removeFromRight (Layout::headerControlGap);
+        voices.setBounds (r.removeFromRight (Layout::headerVoicesWidth).reduced (0, 5));
+        presets.setBounds (Layout::headerPresetLeft, 7, Layout::headerPresetWidth, getHeight() - 14);
     }
 private:
     void timerCallback() override
     {
-        // Manual BPM remains editable: it is also the fallback when the host has no tempo.
-        const bool host = state.getRawParameterValue (ParamIDs::tempoSync)->load() >= 0.5f;
-        tempo.slider.setTooltip (host ? "Fallback BPM when host tempo is unavailable (including standalone)." : "Manual BPM for delays and modulation.");
-        tempo.setAlpha (host ? 0.7f : 1.0f);
+        presets.refreshName();
     }
-    State& state;
     juce::Image logo;
-    ParameterControl master, tempo;
-    Toggle sync;
+    HeaderKnobCard tempo, master;
     StereoMeter meter;
+    OutputSpectrum spectrum;
+    PresetStrip presets;
+    VoiceCount voices;
 };
 }
 
@@ -781,7 +1227,5 @@ void EditorContent::paint (juce::Graphics& g)
     }
     caption (g, "TERATOAMOR  /  " + juce::String (JucePlugin_VersionString),
              { Layout::margin, getHeight() - Layout::footer, 400, Layout::footer }, 11);
-    caption (g, "NOISE INTO FORM", { getWidth() - 250, getHeight() - Layout::footer, 230, Layout::footer },
-             11, Theme::mauve, juce::Justification::centredRight);
 }
 }

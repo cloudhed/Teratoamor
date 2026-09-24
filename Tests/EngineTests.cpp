@@ -785,7 +785,21 @@ int main()
             return c;
         };
 
-        const double sr = 48000.0, f0 = 20.0 * std::pow (1000.0, 0.5);   // Cutoff 50 = about 632 Hz
+        const double sr = 48000.0, f0 = 20.0 * std::pow (1000.0, 0.5);   // Unchanged Bandpass/Peak Cutoff 50
+        const double lpF0 = GlobalFilter::cutoffToHz (GlobalFilterType::lowpass, 0.5f);
+        const auto oldCutoffHz = [] (double position) { return 20.0 * std::pow (1000.0, position); };
+        const auto matchesOldPosition = [&] (GlobalFilterType type, double newPosition, double oldPosition)
+        {
+            return std::abs (std::log2 (GlobalFilter::cutoffToHz (type, (float) newPosition)
+                                         / oldCutoffHz (oldPosition))) < 0.20;
+        };
+        check (matchesOldPosition (GlobalFilterType::lowpass, 0.02, 0.29)
+            && matchesOldPosition (GlobalFilterType::lowpass, 0.05, 0.39)
+            && matchesOldPosition (GlobalFilterType::lowpass, 0.10, 0.50)
+            && matchesOldPosition (GlobalFilterType::highpass, 1.0, 0.86),
+            "Lowpass and Highpass cutoff match the listening anchor settings");
+        check (GlobalFilter::cutoffToHz (GlobalFilterType::lowpass, 0.0f) == GlobalFilter::minCutoffHz,
+            "Lowpass zero keeps its near-silent 20 Hz endpoint");
         const size_t from = 96000;
         const auto none = spectrum (playGlobal (GlobalFilterType::bypass, 100.0f, 0.0f).l, sr, from);
         const auto lp = spectrum (playGlobal (GlobalFilterType::lowpass, 50.0f, 0.0f).l, sr, from);
@@ -795,7 +809,7 @@ int main()
         const auto pk = spectrum (playGlobal (GlobalFilterType::peak, 50.0f, 50.0f).l, sr, from);
 
         check (std::abs (db (none.mean (8000.0, 16000.0) / none.mean (200.0, 400.0))) < 3.0, "global Bypass leaves white noise flat");
-        check (db (lp.mean (100.0, 300.0) / lp.mean (8000.0, 16000.0)) > 40.0, "Lowpass passes lows and removes highs");
+        check (db (lp.mean (100.0, 300.0) / lp.mean (8000.0, 16000.0)) > 12.0, "Lowpass passes lows and removes highs");
         check (db (hp.mean (8000.0, 16000.0) / hp.mean (20.0, 60.0)) > 30.0, "Highpass passes highs and removes lows");
         check (db (bp.mean (f0 * 0.97, f0 * 1.03) / bp.mean (8000.0, 16000.0)) > 20.0
             && db (bp.mean (f0 * 0.97, f0 * 1.03) / bp.mean (40.0, 80.0)) > 12.0, "Bandpass peaks at the cutoff");
@@ -806,11 +820,11 @@ int main()
 
         // Higher Q gives a taller resonance at the cutoff.
         const auto lpHigh = spectrum (playGlobal (GlobalFilterType::lowpass, 50.0f, 100.0f).l, sr, from);
-        check (db (lpHigh.peak (f0 * 0.8, f0 * 1.2) / lp.peak (f0 * 0.8, f0 * 1.2)) > 15.0, "Q raises a resonant peak at the cutoff");
+        check (db (lpHigh.peak (lpF0 * 0.8, lpF0 * 1.2) / lp.peak (lpF0 * 0.8, lpF0 * 1.2)) > 15.0, "Q raises a resonant peak at the cutoff");
 
         // Lowering the cutoff moves the corner down.
         const auto lpLower = spectrum (playGlobal (GlobalFilterType::lowpass, 25.0f, 0.0f).l, sr, from);
-        check (db (lpLower.mean (2000.0, 4000.0) / lp.mean (2000.0, 4000.0)) < -20.0, "lower Cutoff removes more of the highs");
+        check (db (lpLower.mean (8000.0, 12000.0) / lp.mean (8000.0, 12000.0)) < -15.0, "lower Cutoff removes more of the highs");
     }
 
     // 23. Global filter stays finite and bounded at extreme settings, rates, and rapid changes.

@@ -9,8 +9,8 @@
 // the summed Elements. It is a textbook design, an original implementation of the standard
 // low-pass, high-pass, band-pass, band-reject, and peak responses.
 //
-// The Cutoff and Q mappings below are first estimates from the panel's 0..100 controls, not
-// fitted to recordings. The filter runs in every mode (Bypass just outputs the input), so
+// The Lowpass and Highpass Cutoff mappings use listening comparisons; Q and the other modes
+// retain their first estimates. The filter runs in every mode (Bypass just outputs the input), so
 // switching type never starts from stale or empty state and does not click.
 class GlobalFilter
 {
@@ -21,10 +21,18 @@ public:
     static constexpr float maxQ = 25.0f;
     static constexpr float peakGain = 3.0f;      // Peak type: about +12 dB at the centre
 
-    // Cutoff 0..1 -> 20 Hz .. 20 kHz, exponential so equal knob steps are equal musical steps.
-    static float cutoffToHz (float cutoff01) noexcept
+    // Lowpass: reference 2/5/10 sound like the old Teratoamor 29/39/about 50.
+    // A power curve through the first two observations predicts 48 at 10.
+    // Highpass: reference 100 sounds like the old Teratoamor 86; intermediate
+    // positions are scaled linearly until further comparisons are available.
+    static float cutoffToHz (GlobalFilterType type, float cutoff01) noexcept
     {
-        return minCutoffHz * std::pow (maxCutoffHz / minCutoffHz, std::clamp (cutoff01, 0.0f, 1.0f));
+        float position = std::clamp (cutoff01, 0.0f, 1.0f);
+        if (type == GlobalFilterType::lowpass)
+            position = std::pow (position, 0.315f);
+        else if (type == GlobalFilterType::highpass)
+            position *= 0.86f;
+        return minCutoffHz * std::pow (maxCutoffHz / minCutoffHz, position);
     }
 
     // Q 0..1 -> 0.71 .. 25, exponential.
@@ -45,7 +53,7 @@ public:
         type = newType;
 
         const float nyquistLimit = 0.45f * static_cast<float> (sampleRate);
-        const float f = std::min (cutoffToHz (cutoff01), nyquistLimit);
+        const float f = std::min (cutoffToHz (type, cutoff01), nyquistLimit);
 
         const float g = std::tan (3.14159265358979f * f / static_cast<float> (sampleRate));
         k = 1.0f / knobToQ (q01);

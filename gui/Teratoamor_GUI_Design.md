@@ -12,8 +12,12 @@ The cleaner mockup is the visual reference. The initial working editor uses the
 embedded PNG glyph, procedurally drawn panels and controls, three permanently
 visible Elements, and a lower workspace with **Global / Modulation (Env) /
 Modulation (Osc) / Space** tabs.
-Master and the stereo output meter are together in the permanent top bar, as
-requested. Tempo and host sync also remain visible. The meter reads accumulated
+The permanent top bar now has the logo, a preset browser with INIT/SAVE, a MIDI
+activity light and active voice count, a compact live output spectrum, matching
+Tempo and Master cards with aligned readouts and footers, and the stereo output meter.
+The Tempo footer has a HOST SYNC pill. The Master card displays the linear master
+gain as decibels, including minus infinity at zero. The preset browser uses
+`.teratoamor` files and defaults to `Documents/Teratoamor/Presets`. The meter reads accumulated
 output peaks at 30 Hz, falls by 36 dB/second, and displays a 1.5-second CLIP label.
 It is a sample-peak meter, not a true-peak or loudness meter.
 
@@ -49,10 +53,10 @@ The processor supersedes older inventory details below:
 - Parameter readouts retain processor units (including 0–100 control values).
   They do not claim those values are Hz, dB, seconds or Q factors. Envelope plots
   show a normalised shape with an illustrative sustain duration, not live voices.
-- Manual BPM remains editable with sync enabled because it is also the fallback
-  when no host tempo is available, including the standalone application.
-- Preset management, A/B, MIDI assignments and live voice/MIDI activity are future
-  work. The first editor does not display nonfunctional controls for them.
+- HOST SYNC disables manual BPM editing and displays the current host tempo.
+  When no host tempo is available, the saved manual BPM remains the audio and
+  display fallback. Turning HOST SYNC off makes the manual BPM editable again.
+- A/B comparison and MIDI assignments are future work.
 
 ### Adjusting the layout
 
