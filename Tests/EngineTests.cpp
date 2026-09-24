@@ -471,6 +471,41 @@ int main()
         check (clip100.h3 > clip100.h2 + 6.0 && clip100.h3 > -20.0, "Clip 100 produces prominent odd harmonics");
     }
 
+    // Warp's asymmetric terms must not turn a narrow high note into a large sub-bass signal.
+    // The pitch-tracking cleanup acts only on the added Warp component, so a bass note can
+    // still retain its fundamental and gain a second harmonic.
+    {
+        const double sr = 48000.0;
+        auto playWarp = [sr] (int note, float warp)
+        {
+            Engine e; e.prepare (sr);
+            auto p = defaultParams();
+            p.elements[0].width = 100.0f;
+            p.elements[0].warp = warp;
+            e.setParams (p);
+            e.noteOn (note, 1.0f);
+            Capture c; renderBlocks (e, c, (int) sr * 5);
+            return spectrum (c.l, sr, (size_t) sr);
+        };
+
+        const auto highDry = playWarp (72, 0.0f);
+        const auto highWarp = playWarp (72, 100.0f);
+        const double lowRise = db (highWarp.mean (30.0, 180.0) / highDry.mean (30.0, 180.0));
+        const double lowVsFundamental = db (highWarp.mean (30.0, 180.0) / highWarp.peak (510.0, 536.0));
+        std::printf ("       Warp 100 at 523 Hz: 30-180 Hz rise %.1f dB; low band vs fundamental %.1f dB\n",
+                     lowRise, lowVsFundamental);
+        check (lowVsFundamental < -35.0, "Warp on a high note does not create a strong low-frequency floor");
+
+        const auto bassDry = playWarp (36, 0.0f);
+        const auto bassWarp = playWarp (36, 100.0f);
+        const double bassFundamental = db (bassWarp.peak (60.0, 71.0) / bassDry.peak (60.0, 71.0));
+        const double bassSecond = db (bassWarp.peak (125.0, 137.0) / bassWarp.peak (60.0, 71.0));
+        std::printf ("       Warp 100 at 65 Hz: fundamental change %.1f dB; second harmonic %.1f dB\n",
+                     bassFundamental, bassSecond);
+        check (bassFundamental > -4.0 && bassSecond > -9.0,
+               "Warp retains bass fundamentals and adds their second harmonic");
+    }
+
     // 15. Warp and Clip stay finite and bounded at their extremes in every filter mode.
     {
         bool ok = true;

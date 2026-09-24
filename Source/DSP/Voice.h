@@ -174,7 +174,7 @@ public:
             const float hz = 440.0f * std::exp2 ((midiNote - 69.0f) / 12.0f);
             el.filter.setMode (frame.mode);
             el.filter.setParameters (hz, width, sampleRate);
-            el.shaper.setParameters (warp, clip);
+            el.shaper.setParameters (warp, clip, hz, sampleRate);
 
             const float gain = targetRms * playingVelocity;
 

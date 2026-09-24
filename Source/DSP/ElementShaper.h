@@ -9,7 +9,7 @@
 //
 // Both curves are original designs fitted to measurements of the reference recordings
 // (see docs/CHIMERA_REFERENCE.md):
-//   Warp: asymmetric waveshaper  y = x + a * (x^2 - mean(x^2)), which adds even harmonics.
+//   Warp: asymmetric square/rectified shaping with pitch-tracked cleanup of the added signal.
 //   Clip: drive followed by a hard clip at a fixed ceiling; barely active below Clip 75.
 class ElementShaper
 {
@@ -45,13 +45,25 @@ public:
     }
 
     // Mean of x^2 (1) and of |x| (sqrt(2/pi)) for a unit-RMS signal.
-    void reset() noexcept { mean = 1.0f; meanAbs = 0.7978846f; }
+    void reset() noexcept
+    {
+        mean = 1.0f;
+        meanAbs = 0.7978846f;
+        warpHighpassA = warpHighpassB = 0.0f;
+    }
 
     // warp01 and clip01 are 0..1. Call once per control chunk.
-    void setParameters (float warp01, float clip01) noexcept
+    void setParameters (float warp01, float clip01, float pitchHz, double sampleRate) noexcept
     {
         warpAmount = warpAmountAtMax * std::pow (std::clamp (warp01, 0.0f, 1.0f), warpCurve);
         warpNormalise = 1.0f / std::sqrt (1.0f + 2.0f * warpAmount * warpAmount);   // keep RMS steady
+
+        // The asymmetric terms also create difference frequencies below the played note.
+        // Remove those from the added Warp signal only. Tracking pitch keeps low notes and
+        // their fundamentals intact, while two stages leave the even harmonics largely intact.
+        const float cutoff = std::clamp (pitchHz, 10.0f, 0.45f * static_cast<float> (sampleRate));
+        const float g = std::tan (3.14159265358979f * cutoff / static_cast<float> (sampleRate));
+        warpHighpassCoefficient = g / (1.0f + g);
 
         const float c = std::clamp (clip01, 0.0f, 1.0f);
 
@@ -79,7 +91,8 @@ public:
 
         const float bend = (1.0f - warpRectifiedShare) * (squared - mean)
                          + warpRectifiedShare * rectifiedScale * (magnitude - meanAbs);
-        float y = (x + warpAmount * bend) * warpNormalise;
+        const float highpassed = highpass (highpass (bend, warpHighpassA), warpHighpassB);
+        float y = (x + warpAmount * highpassed) * warpNormalise;
 
         y = std::clamp (y * clipGain, -clipCeiling, clipCeiling) * clipMakeUp;
 
@@ -93,6 +106,15 @@ public:
     }
 
 private:
+    float highpass (float input, float& state) noexcept
+    {
+        const float v = warpHighpassCoefficient * (input - state);
+        const float lowpassed = state + v;
+        state = lowpassed + v;
+        return input - lowpassed;
+    }
+
     float meanCoefficient = 0.001f, mean = 1.0f, meanAbs = 0.7978846f;
+    float warpHighpassCoefficient = 0.0f, warpHighpassA = 0.0f, warpHighpassB = 0.0f;
     float warpAmount = 0.0f, warpNormalise = 1.0f, clipGain = 1.0f, clipMakeUp = 1.0f, lastClip = 0.0f;
 };

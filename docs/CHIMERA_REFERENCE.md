@@ -142,6 +142,8 @@ These descriptions identify audible targets. Filter topology and numerical imple
 - Measured from `03_warp_*.wav` (note 60, Element 1, Width 90): second harmonic relative to the fundamental is -18.7, -14.9, -10.7, -8.1 dB at Warp 25, 50, 75, 100, roughly linear in amplitude. The fourth and sixth harmonics rise too, while odd harmonics stay weak. The recordings have no DC offset and about the same level (within 1.5 dB) as unwarped output.
 - The parameter export lists Warp on all three Elements.
 
+Teratoamor implementation note (2026-09-24): Squaring and rectifying a narrow-band filtered note also creates difference-frequency energy below the played pitch. A two-stage high-pass now acts only on the added Warp component, with its cutoff following the Element pitch. The original filtered signal bypasses this stage, so low notes retain their fundamentals. This is a Teratoamor correction prompted by user spectrum feedback, not a measurement of Chimera's internal processing.
+
 ## Clip observations
 
 - Values 25 through 75 are restrained at the default signal level.
