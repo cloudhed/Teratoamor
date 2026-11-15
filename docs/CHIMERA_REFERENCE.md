@@ -140,7 +140,7 @@ These descriptions identify audible targets. Filter topology and numerical imple
 - At Warp 100, the second harmonic is approximately 6 dB below the fundamental.
 - A suitable independent starting point is a controllable asymmetric waveshaping stage, refined with listening tests and output measurements.
 - Measured from `03_warp_*.wav` (note 60, Element 1, Width 90): second harmonic relative to the fundamental is -18.7, -14.9, -10.7, -8.1 dB at Warp 25, 50, 75, 100, roughly linear in amplitude. The fourth and sixth harmonics rise too, while odd harmonics stay weak. The recordings have no DC offset and about the same level (within 1.5 dB) as unwarped output.
-- The parameter export lists Warp on all three Elements.
+- The parameter export lists Warp on Elements 1 and 2 only. Element 3 Warp, if present in the interface, is not exposed to the host, so its program values cannot be read.
 
 Teratoamor implementation note (2026-09-24): Squaring and rectifying a narrow-band filtered note also creates difference-frequency energy below the played pitch. A two-stage high-pass now acts only on the added Warp component, with its cutoff following the Element pitch. The original filtered signal bypasses this stage, so low notes retain their fundamentals. This is a Teratoamor correction prompted by user spectrum feedback, not a measurement of Chimera's internal processing.
 
@@ -187,7 +187,9 @@ Decay and Sustain (`09_decay_*.wav`, `10_sustain_*.wav`, `11_combined_d030_s040.
 - The time to reach the sustain level is the Decay time regardless of the Sustain value (Sustain 25, 50, and 75 with Decay 25 all settle at about 2.6 s).
 - Hold above 0 did not play at all in the reference (reported from the user's testing), so it was not measured and Teratoamor has no Hold control.
 
-The factory program data is an opaque binary chunk and was not decoded. Not yet measured: whether Time affects Attack, and the exact Release curve shape.
+The factory program chunk itself was not decoded. Program values are instead read through the public VST2 host interface (see "Factory-program parameter mappings" below). Not yet measured: whether Time affects Attack, and the exact Release curve shape.
+
+Hold (measured 2026-11-15 by black-box rendering): any Element Hold above 0 makes that Element completely silent, and a Modulation 1-3 envelope with Hold above 0 never modulates. Several factory programs set Hold, so those Elements and envelopes are inactive in the original.
 
 ## Measurement practice
 
@@ -224,3 +226,29 @@ Teratoamor implementation choices, awaiting listening feedback:
 - New and older patches start with both lines off, Mix 25, Cut 50, each Rate 1/4, Decay 35, Pan 0. Parameter IDs use `delay_mix`, `delay_cut`, and `delay1_`/`delay2_` with `on`, `rate`, `decay`, and `pan` suffixes (version hint 9).
 
 `TeratoamorDelayTests` verifies timing, fractional delay interpolation, parallel routing, both pan endpoints, independent on/off, Mix, wet-only filter response, rate-change smoothing, block-size independence, maximum delay length, finite output at five sample rates, resets, audio-thread allocation count, and engine routing. Cut strength and Decay feel remain for human listening.
+
+## Factory-program parameter mappings
+
+Measured 2026-11-15. `tools/vst2_param_dump` is a minimal black-box VST2 host: it loads the 32-bit plug-in like a DAW, reads every program's parameter values through the public VST2 interface, and can render notes with chosen parameter values to WAV. It never reads the plug-in's code or decodes its chunk. Each mapping below came from sweeping one control in 0.01 steps (from the `Default` program, note 60 or 48, velocity 100, 44.1 kHz, 120 BPM) and measuring pitch, spectra, echo time, or modulation period. Output and renders stay under the ignored `reference/chimera/`.
+
+Host notes: the plug-in only applies program and parameter changes during host idle calls (`effIdle`/`effEditIdle` plus a Windows message pump), and only forwards values that differ between programs, so the tool re-sends every value before each render.
+
+Every stepped Chimera control selects `round(value x (steps - 1))`:
+
+| Control | Steps | Result |
+| --- | ---: | --- |
+| Element Octave | 6 | -3 to +2 octaves; 0.5-0.7 is octave 0 |
+| Element Semi | 25 | -12 to +12 semitones |
+| Element Filter | 6 | Off, BP Wide, BP Narrow, Peak Wide, Peak Narrow, Bypass (spectra match the earlier mode measurements) |
+| Filter Type | 6 | Bypass, Lowpass, Highpass, Bandpass, Bandreject, Peak (Teratoamor's order) |
+| Delay Time, Modulation 4-6 Rate | 23 | 1/64T, 1/64, 1/64D, 1/32T, 1/32, 1/32D, ... 1/1T, 1/1, 1/1D, 2/1, 4/1 (triplet, straight, dotted per note value) |
+| Modulation 4-6 Waveform | 18 | Teratoamor's Off ... Random order |
+
+Continuous controls:
+
+- Element Detune: linear, `(value - 0.5) x 100` cents (+/-50 cents). Its display reads in octaves.
+- Element Volume and Master Volume: linear amplitude. Teratoamor Element Level 100 with Master 100 measured 9.2 dB louder than Chimera Volume 1.0 with Master Volume 1.0 (BP Wide, Width 90, note 60).
+- Delay Mix 1.0 is fully wet (no dry signal). Delay echoes above about 3 s wrap to a shorter time (1/1D, 2/1, and 4/1 at 120 BPM).
+- Modulation Depth is linear, and the display shows `(value - 0.5) x 20`. Element Pitch targets move +/-24 semitones at full Depth, for envelopes and oscillators alike. Teratoamor now uses this 0.24 semitones per Depth unit; it previously used 0.36. Element and All Pitch match, and other target scales are unmeasured.
+- Host-name quirks: index 84 reports as a second "Modulation2 Time" (taken as Modulation 3 Time), and index 89 reports as "Modulation3 Rate" but sets Modulation 4's rate.
+- Distortion Crush is bipolar, with the least distortion at 0.5 and more towards both ends. Tone acts like a resonant low-pass whose peak rises from about 1 kHz to beyond 10 kHz across the knob. Neither matches Teratoamor's Drive and Tone directly.

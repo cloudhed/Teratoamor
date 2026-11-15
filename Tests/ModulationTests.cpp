@@ -104,8 +104,8 @@ int main()
             "individual Volume affects only its Element and combines with All Volume");
     }
 
-    // Pitch depth scale (0.36 semitones per unit, Depth 100 = three octaves): a Pulse on All Pitch. The free oscillator value
-    // is fed in by hand so the wave position does not matter.
+    // Pitch depth scale (0.24 semitones per unit, Depth 100 = two octaves, measured on the reference):
+    // a Pulse on All Pitch. The free oscillator value is fed in by hand so the wave position does not matter.
     {
         auto p = basePatch();
         auto& m = p.mods[3];
@@ -114,11 +114,11 @@ int main()
         s.prepare (sr, 0);
         s.noteOn (p);
 
-        const float depths[]   = { 10.0f, 20.0f, 25.0f, 50.0f, -50.0f };
-        const float expected[] = { -3.6f, -7.2f, -9.0f, -18.0f, 18.0f };   // low half of the Pulse
-        const char* names[] = { "Depth 10 is 3.6 semitones down", "Depth 20 is 7.2 semitones down",
-                                "Depth 25 is 9 semitones down", "Depth 50 is 18 semitones down",
-                                "Depth -50 inverts the wave: 18 semitones up" };
+        const float depths[]   = { 10.0f, 25.0f, 50.0f, 100.0f, -50.0f };
+        const float expected[] = { -2.4f, -6.0f, -12.0f, -24.0f, 12.0f };   // low half of the Pulse
+        const char* names[] = { "Depth 10 is 2.4 semitones down", "Depth 25 is 6 semitones down",
+                                "Depth 50 is an octave down", "Depth 100 is two octaves down",
+                                "Depth -50 inverts the wave: an octave up" };
 
         for (int i = 0; i < 5; ++i)
         {
@@ -206,7 +206,7 @@ int main()
         auto p = basePatch();
         p.elements[0].width = 85.0f;   // narrow enough that zero crossings follow the pitch
         p.mods[3].wave = ModWave::pulse100; p.mods[3].target = ModTarget::allPitch;
-        p.mods[3].depth = 100.0f / 3.0f; p.mods[3].rate = rate1over1;   // +/-12 semitones
+        p.mods[3].depth = 50.0f; p.mods[3].rate = rate1over1;   // +/-12 semitones
         Engine e;
         e.prepare (sr);
         e.setParams (p);
@@ -220,7 +220,7 @@ int main()
         }
         const double high = crossingsPerSecond (l, 0.5, 0.95), low = crossingsPerSecond (l, 1.5, 1.95);
         std::printf ("       high half %.0f crossings/s, low half %.0f\n", high, low);
-        check (high > 2.5 * low && high < 6.0 * low, "Pulse on All Pitch alternates two octaves apart at Depth 33");
+        check (high > 2.5 * low && high < 6.0 * low, "Pulse on All Pitch alternates two octaves apart at Depth 50");
     }
 
     // Engine: Glide makes a new note slide up from the previous note; Glide 0 does not.

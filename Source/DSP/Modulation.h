@@ -15,13 +15,14 @@
 // and one target.
 //
 // Units: a section adds "units" to its target. For 0..100 controls (and -100..100 Pan) one unit is
-// one control step, so Depth 100 can sweep the whole control. Pitch is 0.36 semitones per unit
-// (Depth 100 = three octaves; the original measured 0.48, but that was too extreme to play with,
-// so Depth 75 in the first version is now Depth 100). Rate is 4 octaves per 100 units.
+// one control step, so Depth 100 can sweep the whole control. Pitch is 0.24 semitones per unit
+// (Depth 100 = two octaves each way), measured from rendered notes for envelope and oscillator
+// sections on Element and All Pitch. An oscillator at Depth 25 therefore swings one octave from
+// its lowest to its highest point. Rate is 4 octaves per 100 units.
 // Envelopes give 0..1 times Depth; oscillators give -1..1 times Depth.
 namespace Modulation
 {
-    constexpr float pitchSemitonesPerUnit = 0.36f;   // Depth 100 = three octaves
+    constexpr float pitchSemitonesPerUnit = 0.24f;   // Depth 100 = two octaves
     constexpr float rateOctavesPerHundredUnits = 4.0f;
 
     using Units = std::array<float, ModTargets::count>;
